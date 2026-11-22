@@ -32,14 +32,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Add Android platform (if missing)
