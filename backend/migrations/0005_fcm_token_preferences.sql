@@ -1,0 +1,1 @@
+ALTER TABLE fcm_tokens ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}';
