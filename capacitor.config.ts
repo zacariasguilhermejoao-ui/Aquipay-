@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'dev.isabstudio.aquipay',
+  appId: 'com.aquipay.isabstudio',
   appName: 'Aquipay',
   webDir: 'site',
   server: {
