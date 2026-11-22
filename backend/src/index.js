@@ -145,7 +145,7 @@ async function pushTo(env,userId,kind,title,body){
         const r=await sendFcm(env,account,row.token,payload);
         if(r.status===404||r.status===400){
           const d=await r.json().catch(()=>({}));
-          if(JSON.stringify(d).includes('UNREGISTERED')||JSON.stringify(d).includes('INVALID_ARGUMENT'))await env.DB.prepare('DELETE FROM fcm_tokens WHERE token=?').bind(row.token).run();
+          if(JSON.stringify(d).includes('UNREGISTERED'))await env.DB.prepare('DELETE FROM fcm_tokens WHERE token=?').bind(row.token).run();
         }
       }));
     })());
