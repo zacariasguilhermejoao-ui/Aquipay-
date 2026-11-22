@@ -1,0 +1,85 @@
+name: Build Android APK + AAB
+
+on:
+  workflow_dispatch:   # Manual (botão "Run workflow")
+  push:
+    tags:
+      - 'v*'           # Também corre quando criares uma tag v1.0.0, v1.0.1, etc.
+
+jobs:
+  build:
+    name: Build APK e AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      # ---------- Assinatura (opcional mas recomendado) ----------
+      # Descomenta quando tiveres o keystore nos Secrets
+      #
+      # - name: Decode keystore
+      #   run: |
+      #     echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.jks
+      #
+      # - name: Build signed Release
+      #   working-directory: android
+      #   env:
+      #     KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      #     KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      #     KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      #   run: |
+      #     ./gradlew assembleRelease bundleRelease
+      # -----------------------------------------------------------
+
+      # Build sem assinatura (debug + release unsigned) - funciona já
+      - name: Build APK (debug)
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Build AAB + APK (release unsigned)
+        working-directory: android
+        run: ./gradlew bundleRelease assembleRelease
+
+      - name: Upload APK (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: aquipay-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - name: Upload APK (release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: aquipay-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Upload AAB (release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: aquipay-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
