@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /*?share=
+
+Sitemap: https://aquipay.isabstudio.dev/sitemap.xml
