@@ -115,9 +115,10 @@ async function sendFcm(env,account,token,payload){
   });
 }
 async function registerFcmToken(req,env,me){
-  const b=await json(req,3000),token=clean(b.token,4096),platform=clean(b.platform,20)||'android';
-  if(token.length<40||!['android'].includes(platform))return err('Token FCM inválido.');
-  await env.DB.prepare('INSERT INTO fcm_tokens(token,user_id,platform) VALUES(?,?,?) ON CONFLICT(token) DO UPDATE SET user_id=excluded.user_id,platform=excluded.platform,created_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')').bind(token,me.id,platform).run();
+  const b=await json(req,5000),token=clean(b.token,4096),platform=clean(b.platform,20)||'android',pr=b.prefs||{};
+  if(token.length<40||platform!=='android')return err('Token FCM inválido.');
+  const prefs=JSON.stringify({candidaturas:pr.candidaturas!==false,pagamentos:pr.pagamentos!==false,mensagens:pr.mensagens!==false,novidades:pr.novidades===true});
+  await env.DB.prepare("INSERT INTO fcm_tokens(token,user_id,platform,prefs) VALUES(?,?,?,?) ON CONFLICT(token) DO UPDATE SET user_id=excluded.user_id,platform=excluded.platform,prefs=excluded.prefs,created_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(token,me.id,platform,prefs).run();
   await env.DB.prepare('DELETE FROM fcm_tokens WHERE user_id=? AND token NOT IN (SELECT token FROM fcm_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 5)').bind(me.id,me.id).run();
   return out({ok:true},201);
 }
@@ -137,8 +138,10 @@ async function pushTo(env,userId,kind,title,body){
   }
   if(env.FIREBASE_SERVICE_ACCOUNT_B64){
     jobs.push((async()=>{
-      const [account,tokens]=await Promise.all([firebaseCredentials(env),env.DB.prepare('SELECT token FROM fcm_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 5').bind(userId).all()]);
+      const [account,tokens]=await Promise.all([firebaseCredentials(env),env.DB.prepare('SELECT token,prefs FROM fcm_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 5').bind(userId).all()]);
       await Promise.allSettled(tokens.results.map(async row=>{
+        let prefs={};try{prefs=JSON.parse(row.prefs||'{}')}catch{}
+        if(prefs[pref]===false)return;
         const r=await sendFcm(env,account,row.token,payload);
         if(r.status===404||r.status===400){
           const d=await r.json().catch(()=>({}));
