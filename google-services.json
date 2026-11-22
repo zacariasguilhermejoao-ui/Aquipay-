@@ -1,0 +1,28 @@
+{
+  "project_info": {
+    "project_number": "970904129691",
+    "project_id": "aquipay-415a4",
+    "storage_bucket": "aquipay-415a4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970904129691:android:24cd43df17f745449bf63e",
+        "android_client_info": {
+          "package_name": "com.aquipay.isabstudio"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1weHe43VFI3DpI9NROEZC7OzkBJSF0dg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
