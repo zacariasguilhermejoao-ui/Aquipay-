@@ -162,7 +162,7 @@ async doClear(){try{(await idb).close()}catch{}await new Promise(ok=>{const r=in
 askDelete(){const m=CFG.supportEmail,q=encodeURIComponent('Peço a eliminação da minha conta Aquipay ('+(S.me.email||'')+').');sheet(`<h3 style="margin-bottom:.5rem">Pedir eliminação da conta</h3><p class="mut" style="margin-bottom:1rem">Apagamos a conta e os dados pessoais associados em até 30 dias. O pedido deve seguir do email da conta, para confirmarmos que é teu.</p><div class="stack"><a class="btn" href="mailto:${m}?subject=${encodeURIComponent('Eliminação da conta Aquipay')}&body=${q}">Enviar pedido por email</a><button class="btn secondary" data-a="close">Cancelar</button></div>`)},
 async logout(){closeSheet();if(S.me?.apiToken){if(nativeFcmToken){try{await api('/api/push/fcm/unregister',{method:'POST',body:JSON.stringify({token:nativeFcmToken})})}catch{}nativeFcmToken=''}try{if(!isNativeApp()){const sb=await(await navigator.serviceWorker.ready).pushManager.getSubscription();if(sb)await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sb.endpoint})})}}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}}S.me=null;S.v='home';await put('kv',{id:'session',uid:null});render()}};
 const urlKey=k=>Uint8Array.from(atob((k+'='.repeat((4-k.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
-const nativePushPlugin=()=>window.Capacitor?.Plugins?.PushNotifications;
+const nativePushPlugin=()=>window.AquipayNativePush||window.Capacitor?.Plugins?.PushNotifications;
 const isNativeApp=()=>!!(window.Capacitor?.isNativePlatform?.()||window.Capacitor?.getPlatform?.()==='android');
 let nativePushListeners=false,nativeFcmToken='';
 async function syncNativePush(requestPermission=false){
