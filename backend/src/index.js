@@ -84,7 +84,7 @@ function decodeB64(value){
 }
 async function firebaseCredentials(env){
   if(!env.FIREBASE_SERVICE_ACCOUNT_B64)throw Error('firebase_secret_missing');
-  const raw=atob(String(env.FIREBASE_SERVICE_ACCOUNT_B64).replace(/\\s/g,''));
+  const raw=atob(String(env.FIREBASE_SERVICE_ACCOUNT_B64).replace(/\s/g,''));
   const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
   const account=JSON.parse(new TextDecoder().decode(bytes));
   if(account.type!=='service_account'||!account.project_id||!account.client_email||!account.private_key)throw Error('firebase_credentials_invalid');
