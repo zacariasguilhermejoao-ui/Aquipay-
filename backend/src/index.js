@@ -96,7 +96,7 @@ async function firebaseAccessToken(account){
   const head=b64(enc.encode(JSON.stringify({alg:'RS256',typ:'JWT'})));
   const claim=b64(enc.encode(JSON.stringify({iss:account.client_email,scope:'https://www.googleapis.com/auth/firebase.messaging',aud:'https://oauth2.googleapis.com/token',iat:now,exp:now+3600})));
   const unsigned=head+'.'+claim;
-  const pem=account.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g,'');
+  const pem=account.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,'');
   const key=await crypto.subtle.importKey('pkcs8',decodeB64(pem),{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
   const signature=b64(await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,enc.encode(unsigned)));
   const assertion=unsigned+'.'+signature;
