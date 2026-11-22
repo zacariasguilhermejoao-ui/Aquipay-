@@ -38,6 +38,16 @@ jobs:
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
           yes | sdkmanager --licenses || true
 
+      # Gera o projeto Android se ainda não existir completo
+      - name: Add Android platform (if missing)
+        run: |
+          if [ ! -f "android/gradlew" ]; then
+            echo "Projeto Android incompleto. A gerar com cap add android..."
+            npx cap add android
+          else
+            echo "Projeto Android já existe."
+          fi
+
       - name: Capacitor sync
         run: npx cap sync android
 
