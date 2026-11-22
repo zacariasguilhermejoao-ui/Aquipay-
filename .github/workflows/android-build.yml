@@ -1,16 +1,16 @@
 name: Build Android APK + AAB
 
 on:
-  workflow_dispatch:   # Manual (botão "Run workflow")
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'           # Também corre quando criares uma tag v1.0.0, v1.0.1, etc.
+      - 'v*'
 
 jobs:
   build:
     name: Build APK e AAB
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
 
     steps:
       - name: Checkout
@@ -33,17 +33,24 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install required Android packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
+          yes | sdkmanager --licenses || true
+
       - name: Capacitor sync
         run: npx cap sync android
 
-      # Build sem assinatura (debug + release unsigned)
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build APK (debug)
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
-      - name: Build AAB + APK (release unsigned)
+      - name: Build AAB + APK (release)
         working-directory: android
-        run: ./gradlew bundleRelease assembleRelease
+        run: ./gradlew bundleRelease assembleRelease --stacktrace
 
       - name: Upload APK (debug)
         uses: actions/upload-artifact@v4
@@ -51,6 +58,7 @@ jobs:
           name: aquipay-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+          if-no-files-found: ignore
 
       - name: Upload APK (release)
         uses: actions/upload-artifact@v4
@@ -58,6 +66,7 @@ jobs:
           name: aquipay-release-apk
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
+          if-no-files-found: ignore
 
       - name: Upload AAB (release)
         uses: actions/upload-artifact@v4
@@ -65,3 +74,4 @@ jobs:
           name: aquipay-release-aab
           path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
+          if-no-files-found: ignore
