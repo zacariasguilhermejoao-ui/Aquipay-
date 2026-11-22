@@ -3,6 +3,8 @@ name: Build Android APK + AAB
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -40,7 +42,6 @@ jobs:
             build-tools;35.0.0
           accept-android-sdk-licenses: true
 
-      # Gera o projeto Android se ainda não existir completo
       - name: Add Android platform (if missing)
         run: |
           if [ ! -f "android/gradlew" ]; then
