@@ -69,7 +69,7 @@ jobs:
           from pathlib import Path
 
           out = Path("assets/android-generated")
-          purple = (124, 58, 237, 255)
+          splash_bg = (0, 0, 0, 255)
 
           # Reuse the existing AquiPay artwork; only resize/pad it for Android's
           # required source dimensions. No new logo artwork is created.
@@ -83,18 +83,18 @@ jobs:
           source = Image.open("assets/splash/aquipay-splash.png").convert("RGBA")
           source.thumbnail((2732, 2732), Image.Resampling.LANCZOS)
           for name in ("splash.png", "splash-dark.png"):
-              canvas = Image.new("RGBA", (2732, 2732), purple)
+              canvas = Image.new("RGBA", (2732, 2732), splash_bg)
               canvas.alpha_composite(source, ((2732 - source.width) // 2, (2732 - source.height) // 2))
               canvas.save(out / name)
           PY
-          npx --yes @capacitor/assets generate --android --assetPath assets/android-generated --iconBackgroundColor '#7c3aed' --splashBackgroundColor '#7c3aed'
+          npx --yes @capacitor/assets generate --android --assetPath assets/android-generated --iconBackgroundColor '#7c3aed' --splashBackgroundColor '#000000'
 
       - name: Configure Android launch themes
         run: |
           mkdir -p android/app/src/main/res/values android/app/src/main/res/values-v31
           cat > android/app/src/main/res/values/colors.xml <<'EOF'
           <resources>
-              <color name="splash_background">#7c3aed</color>
+              <color name="splash_background">#000000</color>
           </resources>
           EOF
           cat > android/app/src/main/res/values/styles.xml <<'EOF'
@@ -116,7 +116,7 @@ jobs:
                   <item name="android:windowBackground">@color/splash_background</item>
                   <item name="android:windowSplashScreenBackground">@color/splash_background</item>
                   <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-                  <item name="android:windowSplashScreenIconBackgroundColor">#7c3aed</item>
+                  <item name="android:windowSplashScreenIconBackgroundColor">#000000</item>
               </style>
           </resources>
           EOF
