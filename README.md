@@ -35,3 +35,9 @@ A APK usa `@capacitor/push-notifications` com Firebase Cloud Messaging. O token 
 `GOOGLE_CLIENT_ID` aceita vários IDs separados por vírgula (ex.: `ID_WEB,ID_ANDROID`).
 Na APK nativa, usa o ID **Web** como `serverClientId` e envia o `idToken` para `POST /api/auth/google` (`{"credential": "<idToken>"}`).
 Para o login nativo funcionar, regista os SHA-1/SHA-256 da APK no Firebase e volta a descarregar o `google-services.json`.
+
+
+## SEO e navegação
+- A página inicial inclui metadados básicos para motores de busca e pré-visualizações em redes sociais.
+- O sitemap está em `site/sitemap.xml` e as regras de indexação em `site/robots.txt`.
+- O Worker do site usa `not_found_handling: single-page-application` para permitir abrir diretamente as rotas internas da aplicação.
