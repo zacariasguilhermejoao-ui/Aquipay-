@@ -75,14 +75,14 @@ jobs:
           dependency = "classpath 'com.google.gms:google-services:4.4.2'"
           if dependency not in root_text:
               if "dependencies {" in root_text:
-                  root_text = root_text.replace("dependencies {", "dependencies {\\n        " + dependency, 1)
+                  root_text = root_text.replace("dependencies {", "dependencies {\n        " + dependency, 1)
               else:
-                  root_text = "buildscript {\\n    repositories { google(); mavenCentral() }\\n    dependencies { " + dependency + " }\\n}\\n" + root_text
+                  root_text = "buildscript {\n    repositories { google(); mavenCentral() }\n    dependencies { " + dependency + " }\n}\n" + root_text
               root.write_text(root_text)
 
           app_text = app.read_text()
           if "com.google.gms.google-services" not in app_text:
-              app_text += "\\napply plugin: 'com.google.gms.google-services'\\n"
+              app_text += "\napply plugin: 'com.google.gms.google-services'\n"
               app.write_text(app_text)
           PY
 
