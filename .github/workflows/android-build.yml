@@ -60,6 +60,69 @@ jobs:
           fi
           test -f android/gradlew
 
+      - name: Generate Android app icon and splash resources
+        run: |
+          python -m pip install --quiet Pillow
+          mkdir -p assets/android-generated
+          python - <<'PY'
+          from PIL import Image, ImageOps
+          from pathlib import Path
+
+          out = Path("assets/android-generated")
+          purple = (124, 58, 237, 255)
+
+          # Reuse the existing AquiPay artwork; only resize/pad it for Android's
+          # required source dimensions. No new logo artwork is created.
+          icon = Image.open("assets/icon/aquipay-icon.png").convert("RGBA")
+          icon = ImageOps.fit(icon, (1024, 1024), method=Image.Resampling.LANCZOS)
+          icon.save(out / "icon-only.png")
+          icon.save(out / "icon-foreground.png")
+
+          Image.new("RGBA", (1024, 1024), purple).save(out / "icon-background.png")
+
+          source = Image.open("assets/splash/aquipay-splash.png").convert("RGBA")
+          source.thumbnail((2732, 2732), Image.Resampling.LANCZOS)
+          for name in ("splash.png", "splash-dark.png"):
+              canvas = Image.new("RGBA", (2732, 2732), purple)
+              canvas.alpha_composite(source, ((2732 - source.width) // 2, (2732 - source.height) // 2))
+              canvas.save(out / name)
+          PY
+          npx --yes @capacitor/assets generate --android --assetPath assets/android-generated --iconBackgroundColor '#7c3aed' --splashBackgroundColor '#7c3aed'
+
+      - name: Configure Android launch themes
+        run: |
+          mkdir -p android/app/src/main/res/values android/app/src/main/res/values-v31
+          cat > android/app/src/main/res/values/colors.xml <<'EOF'
+          <resources>
+              <color name="splash_background">#7c3aed</color>
+          </resources>
+          EOF
+          cat > android/app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:colorAccent">#7c3aed</item>
+                  <item name="android:statusBarColor">#000000</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:windowLightStatusBar">false</item>
+              </style>
+              <style name="AppTheme.NoActionBarLaunch" parent="@style/AppTheme">
+                  <item name="android:windowBackground">@drawable/splash</item>
+              </style>
+          </resources>
+          EOF
+          cat > android/app/src/main/res/values-v31/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme.NoActionBarLaunch" parent="@style/AppTheme">
+                  <item name="android:windowBackground">@color/splash_background</item>
+                  <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+                  <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+                  <item name="android:windowSplashScreenIconBackgroundColor">#7c3aed</item>
+              </style>
+          </resources>
+          EOF
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/drawable-port-xxxhdpi/splash.png
+
       - name: Capacitor sync
         run: npx cap sync android
 
