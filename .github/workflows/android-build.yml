@@ -32,20 +32,33 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
       - name: Install Android SDK packages
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          yes | sdkmanager --licenses || true
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Add Android platform (if missing)
         run: |
           if [ ! -f "android/gradlew" ]; then
-            echo "Projeto Android incompleto. A gerar com cap add android..."
+            echo "android/gradlew não existe. A preparar uma plataforma Android limpa..."
+            mkdir -p "$RUNNER_TEMP/aquipay-android-backup"
+            if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+              cp "android/app/src/main/AndroidManifest.xml" "$RUNNER_TEMP/aquipay-android-backup/AndroidManifest.xml"
+            fi
+            rm -rf android
             npx cap add android
+            if [ -f "$RUNNER_TEMP/aquipay-android-backup/AndroidManifest.xml" ]; then
+              cp "$RUNNER_TEMP/aquipay-android-backup/AndroidManifest.xml" "android/app/src/main/AndroidManifest.xml"
+            fi
           else
-            echo "Projeto Android já existe."
+            echo "android/gradlew já existe."
           fi
+          test -f android/gradlew
 
       - name: Capacitor sync
         run: npx cap sync android
