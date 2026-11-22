@@ -77,17 +77,77 @@ async function encryptPush(sub,payload){
 async function sendPush(env,sub,payload){
   return fetch(sub.endpoint,{method:'POST',headers:{'content-encoding':'aes128gcm','content-type':'application/octet-stream','ttl':'86400','urgency':'normal','authorization':await vapidAuth(env,sub.endpoint)},body:await encryptPush(sub,payload),signal:AbortSignal.timeout(5000)});
 }
+let fcmAccessToken='',fcmAccessTokenExp=0;
+function decodeB64(value){
+  const s=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
+  return Uint8Array.from(atob(s+'='.repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
+}
+async function firebaseCredentials(env){
+  if(!env.FIREBASE_SERVICE_ACCOUNT_B64)throw Error('firebase_secret_missing');
+  const raw=atob(String(env.FIREBASE_SERVICE_ACCOUNT_B64).replace(/\\s/g,''));
+  const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+  const account=JSON.parse(new TextDecoder().decode(bytes));
+  if(account.type!=='service_account'||!account.project_id||!account.client_email||!account.private_key)throw Error('firebase_credentials_invalid');
+  return account;
+}
+async function firebaseAccessToken(account){
+  if(fcmAccessToken&&fcmAccessTokenExp>Date.now()+60000)return fcmAccessToken;
+  const now=Math.floor(Date.now()/1000);
+  const head=b64(enc.encode(JSON.stringify({alg:'RS256',typ:'JWT'})));
+  const claim=b64(enc.encode(JSON.stringify({iss:account.client_email,scope:'https://www.googleapis.com/auth/firebase.messaging',aud:'https://oauth2.googleapis.com/token',iat:now,exp:now+3600})));
+  const unsigned=head+'.'+claim;
+  const pem=account.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g,'');
+  const key=await crypto.subtle.importKey('pkcs8',decodeB64(pem),{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
+  const signature=b64(await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,enc.encode(unsigned)));
+  const assertion=unsigned+'.'+signature;
+  const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}),signal:AbortSignal.timeout(8000)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.access_token)throw Error('firebase_oauth_failed');
+  fcmAccessToken=data.access_token;fcmAccessTokenExp=Date.now()+Number(data.expires_in||3600)*1000;
+  return fcmAccessToken;
+}
+async function sendFcm(env,account,token,payload){
+  const access=await firebaseAccessToken(account);
+  return fetch('https://fcm.googleapis.com/v1/projects/'+encodeURIComponent(account.project_id)+'/messages:send',{
+    method:'POST',headers:{authorization:'Bearer '+access,'content-type':'application/json'},
+    body:JSON.stringify({message:{token,notification:{title:payload.title,body:payload.body},data:{url:String(payload.url||'/'),kind:String(payload.kind||'novidades')},android:{priority:'HIGH',notification:{channel_id:'default',sound:'default'}}}}),
+    signal:AbortSignal.timeout(8000)
+  });
+}
+async function registerFcmToken(req,env,me){
+  const b=await json(req,3000),token=clean(b.token,4096),platform=clean(b.platform,20)||'android';
+  if(token.length<40||!['android'].includes(platform))return err('Token FCM inválido.');
+  await env.DB.prepare('INSERT INTO fcm_tokens(token,user_id,platform) VALUES(?,?,?) ON CONFLICT(token) DO UPDATE SET user_id=excluded.user_id,platform=excluded.platform,created_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')').bind(token,me.id,platform).run();
+  await env.DB.prepare('DELETE FROM fcm_tokens WHERE user_id=? AND token NOT IN (SELECT token FROM fcm_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 5)').bind(me.id,me.id).run();
+  return out({ok:true},201);
+}
 async function pushTo(env,userId,kind,title,body){
-  try{
-    if(!env.VAPID_PRIVATE_KEY||!env.VAPID_PUBLIC_KEY)return;
-    const subs=await env.DB.prepare('SELECT endpoint,p256dh,auth,prefs FROM push_subscriptions WHERE user_id=? ORDER BY created_at DESC LIMIT 5').bind(userId).all(),pref=PUSH_PREF[kind]||'novidades',payload=JSON.stringify({title:title.slice(0,80),body:body.slice(0,200),url:'/',kind});
-    await Promise.allSettled(subs.results.map(async s=>{
-      let prefs={};try{prefs=JSON.parse(s.prefs||'{}')}catch{}
-      if(prefs[pref]===false)return;
-      const r=await sendPush(env,s,payload);
-      if(r.status===404||r.status===410)await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').bind(s.endpoint).run();
-    }));
-  }catch(e){console.error('push',e)}
+  const pref=PUSH_PREF[kind]||'novidades',payload={title:title.slice(0,80),body:body.slice(0,200),url:'/',kind};
+  const jobs=[];
+  if(env.VAPID_PRIVATE_KEY&&env.VAPID_PUBLIC_KEY){
+    jobs.push((async()=>{
+      const subs=await env.DB.prepare('SELECT endpoint,p256dh,auth,prefs FROM push_subscriptions WHERE user_id=? ORDER BY created_at DESC LIMIT 5').bind(userId).all();
+      await Promise.allSettled(subs.results.map(async s=>{
+        let prefs={};try{prefs=JSON.parse(s.prefs||'{}')}catch{}
+        if(prefs[pref]===false)return;
+        const r=await sendPush(env,s,JSON.stringify(payload));
+        if(r.status===404||r.status===410)await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').bind(s.endpoint).run();
+      }));
+    })());
+  }
+  if(env.FIREBASE_SERVICE_ACCOUNT_B64){
+    jobs.push((async()=>{
+      const [account,tokens]=await Promise.all([firebaseCredentials(env),env.DB.prepare('SELECT token FROM fcm_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 5').bind(userId).all()]);
+      await Promise.allSettled(tokens.results.map(async row=>{
+        const r=await sendFcm(env,account,row.token,payload);
+        if(r.status===404||r.status===400){
+          const d=await r.json().catch(()=>({}));
+          if(JSON.stringify(d).includes('UNREGISTERED')||JSON.stringify(d).includes('INVALID_ARGUMENT'))await env.DB.prepare('DELETE FROM fcm_tokens WHERE token=?').bind(row.token).run();
+        }
+      }));
+    })());
+  }
+  try{await Promise.allSettled(jobs)}catch(e){console.error('push',e)}
 }
 async function pushSubscribe(req,env,me){
   const b=await json(req,4000),s=b.subscription||{},ep=clean(s.endpoint,600),k=s.keys||{},p256=clean(k.p256dh,200),au=clean(k.auth,60),pr=b.prefs||{};
@@ -109,6 +169,8 @@ async function api(req,env){const u=new URL(req.url),p=u.pathname,m=req.method;
  if(p==='/api/auth/login'&&m==='POST'){const rl=await limited(req,env,'login',10,900);if(rl)return rl;const b=await json(req),email=clean(b.email,254).toLowerCase(),password=typeof b.password==='string'?b.password:'';const x=await env.DB.prepare("SELECT id,name,email,password_hash,password_salt,status FROM users WHERE email=?").bind(email).first();if(!x||x.status!=='active'||!password||await passHash(password,x.password_salt)!==x.password_hash)return err('Email ou palavra-passe incorretos.',401);return out({user:{id:x.id,name:x.name,email:x.email},...await session(x.id,env)})}
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
  if(p==='/api/push/subscribe'&&m==='POST')return pushSubscribe(req,env,me);
+ if(p==='/api/push/fcm/register'&&m==='POST')return registerFcmToken(req,env,me);
+ if(p==='/api/push/fcm/unregister'&&m==='POST'){const b=await json(req,3000),token=clean(b.token,4096);await env.DB.prepare('DELETE FROM fcm_tokens WHERE token=? AND user_id=?').bind(token,me.id).run();return out({ok:true})}
  if(p==='/api/push/unsubscribe'&&m==='POST'){const b=await json(req,2000);await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint=? AND user_id=?').bind(clean(b.endpoint,600),me.id).run();return out({ok:true})}
  if(p==='/api/auth/logout'&&m==='POST'){const t=(req.headers.get('authorization')||'').slice(7);await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(t)).run();return out({ok:true})}
  if(p==='/api/me'&&m==='GET'){const [profile,wallet]=await Promise.all([env.DB.prepare('SELECT * FROM profiles WHERE user_id=?').bind(me.id).first(),env.DB.prepare('SELECT available_coins,pending_coins FROM wallets WHERE user_id=?').bind(me.id).first()]);return out({user:me,profile,wallet})}
