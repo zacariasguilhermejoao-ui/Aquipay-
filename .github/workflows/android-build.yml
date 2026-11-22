@@ -60,6 +60,33 @@ jobs:
           fi
           test -f android/gradlew
 
+      - name: Configure Firebase Cloud Messaging
+        run: |
+          cp google-services.json android/app/google-services.json
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path("android/build.gradle")
+          app = Path("android/app/build.gradle")
+          if not root.exists() or not app.exists():
+              raise SystemExit("Gradle files not found after Capacitor Android setup")
+
+          root_text = root.read_text()
+          dependency = "classpath 'com.google.gms:google-services:4.4.2'"
+          if dependency not in root_text:
+              if "dependencies {" in root_text:
+                  root_text = root_text.replace("dependencies {", "dependencies {\\n        " + dependency, 1)
+              else:
+                  root_text = "buildscript {\\n    repositories { google(); mavenCentral() }\\n    dependencies { " + dependency + " }\\n}\\n" + root_text
+              root.write_text(root_text)
+
+          app_text = app.read_text()
+          if "com.google.gms.google-services" not in app_text:
+              app_text += "\\napply plugin: 'com.google.gms.google-services'\\n"
+              app.write_text(app_text)
+          PY
+
+
       - name: Generate Android app icon and splash resources
         run: |
           python -m pip install --quiet Pillow
@@ -78,7 +105,7 @@ jobs:
           icon.save(out / "icon-only.png")
           icon.save(out / "icon-foreground.png")
 
-          Image.new("RGBA", (1024, 1024), purple).save(out / "icon-background.png")
+          Image.new("RGBA", (1024, 1024), (124, 58, 237, 255)).save(out / "icon-background.png")
 
           source = Image.open("assets/splash/aquipay-splash.png").convert("RGBA")
           source.thumbnail((2732, 2732), Image.Resampling.LANCZOS)
