@@ -1,7 +1,7 @@
 'use strict';
 /* Conteúdo das páginas legais e de ajuda.
    Cada secção: [título, [parágrafo | ['item', 'item']]]. Um array dentro da lista é uma lista de pontos. */
-const LEGAL_UPDATED = '22 de novembro de 2026';
+const LEGAL_UPDATED = '23 de novembro de 2026';
 
 const DOCS = {
   termos: {
@@ -19,7 +19,7 @@ const DOCS = {
       ['9. Suspensão e encerramento', ['Podemos limitar, suspender ou encerrar contas que violem estes termos. Podes encerrar a tua conta a qualquer momento, através do pedido de eliminação nas Definições.']],
       ['10. Responsabilidade', ['Fazemos o possível para manter o serviço estável e seguro, mas ele é prestado tal como está disponível. Na medida permitida pela lei, o Aquipay não responde por prejuízos resultantes de acordos feitos entre utilizadores, nem por indisponibilidades fora do nosso controlo.']],
       ['11. Alterações', ['Podemos atualizar estes termos. Quando a alteração for relevante, avisamos na aplicação antes de entrar em vigor. Continuar a usar o Aquipay depois disso significa que aceitas a nova versão.']],
-      ['12. Lei aplicável', ['Estes termos regem-se pela lei da República de Angola. Os litígios serão resolvidos nos tribunais competentes de Luanda, sem prejuízo dos direitos que a lei reconhece aos consumidores.']]
+      ['12. Lei aplicável', ['Estes termos regem-se pela lei da República de Angola. Os litígios serão resolvidos nos tribunais competentes de Luanda, sem prejuízo dos direitos que a lei reconhece aos consumidores.']],\n      ['13. Contacto', ['Para apoio geral, problemas técnicos ou questões sobre estes termos, escreve para {{SUPPORT_EMAIL}}. Para propostas comerciais e parcerias, utiliza {{PARTNERSHIP_EMAIL}}.']]
     ]
   },
 
@@ -35,7 +35,7 @@ const DOCS = {
       ['6. Os teus direitos', [['Aceder aos dados que temos sobre ti e obter uma cópia (Definições, Exportar os meus dados).', 'Corrigir dados incorretos (Editar perfil).', 'Pedir a eliminação da conta e dos dados na aplicação ou em https://aquipay.isabstudio.dev/delete-account.html.', 'Opor-te a certos tratamentos e retirar consentimentos dados.', 'Apresentar reclamação à Agência de Protecção de Dados de Angola.']]],
       ['7. Segurança', ['Usamos ligação cifrada, controlo de acesso e armazenamento protegido. Nenhum sistema é infalível; se ocorrer um incidente que afete os teus dados, avisamos-te e às autoridades, conforme a lei.']],
       ['8. Menores', ['O Aquipay destina-se a maiores de 18 anos. Se descobrirmos uma conta de menor, encerramo-la e apagamos os dados.']],
-      ['9. Contacto', ['Para exercer direitos ou esclarecer dúvidas sobre privacidade, escreve para o contacto indicado na página Ajuda e Contacto.']]
+      ['9. Contacto e pedidos de privacidade', ['Para exercer os teus direitos, pedir acesso, correção ou eliminação de dados, ou esclarecer dúvidas sobre esta política, escreve diretamente para {{PRIVACY_EMAIL}}. Para apoio técnico relacionado com a conta, utiliza {{SUPPORT_EMAIL}}.']]
     ]
   },
 
@@ -47,7 +47,7 @@ const DOCS = {
       ['2. Reembolso de moedas', [['Moedas compradas e ainda não usadas podem ser devolvidas se o pedido for feito até 7 dias após a compra.', 'Moedas já gastas não são reembolsadas.', 'Se um anúncio a que te candidataste for removido por violar as regras, devolvemos as moedas gastas nessa candidatura.']]],
       ['3. Plano Plus', [['O plano renova-se mensalmente até o cancelares.', 'Podes cancelar a qualquer momento e manténs o acesso até ao fim do período já pago.', 'Não fazemos reembolso parcial de períodos em curso, exceto em caso de cobrança indevida ou falha do serviço da nossa parte.']]],
       ['4. Cobranças indevidas', ['Se fores cobrado duas vezes, ou se pagares e não receberes as moedas ou o plano, devolvemos o valor na totalidade ou corrigimos a situação, conforme preferires.']],
-      ['5. Como pedir', ['Envia o pedido para o contacto da página Ajuda e Contacto, com o email da conta, a data e o valor da compra. Respondemos em até 5 dias úteis e, se aprovado, o reembolso é feito pelo mesmo meio de pagamento.']],
+      ['5. Como pedir um reembolso', ['Envia o pedido para {{ACCOUNTS_EMAIL}}, indicando o email associado à conta Aquipay, a data da compra, o valor, o pacote ou plano adquirido e o comprovativo ou referência da transação. Não envies palavras-passe, códigos de autenticação ou dados completos do cartão.', 'A equipa de Contas analisa o pedido e responde em até 5 dias úteis. Quando aprovado, o reembolso é processado pelo mesmo meio de pagamento, sempre que possível, ou corrigimos a cobrança indevida.', 'Se a compra tiver sido processada por uma loja de aplicações ou prestador externo, o pedido também poderá ter de ser apresentado através desse canal e ficará sujeito às respetivas regras, sem prejuízo dos direitos obrigatórios previstos na lei aplicável.', 'Para questões técnicas de acesso à conta, contacta {{SUPPORT_EMAIL}}.']],
       ['6. Pagamentos de trabalhos', ['O dinheiro de um trabalho é pago diretamente entre as partes e não passa pelo Aquipay. Por isso, o Aquipay não reembolsa nem cobra valores de trabalhos. Em caso de desacordo, podes denunciar o perfil e deixar uma classificação.']]
     ]
   },
@@ -60,7 +60,7 @@ const DOCS = {
       ['Respeita os outros', [['Sem insultos, assédio, ameaças ou discriminação.', 'Não partilhes dados de outras pessoas sem autorização.']]],
       ['Não é permitido', [['Pedir pagamento antecipado, taxas de inscrição ou depósitos para dar um trabalho.', 'Publicar ofertas falsas, repetidas ou enganosas.', 'Anunciar trabalhos ilegais ou perigosos.', 'Contornar a plataforma para burlar utilizadores.']]],
       ['O que acontece se violares', ['Podemos remover conteúdo, limitar funcionalidades, suspender ou encerrar a conta, consoante a gravidade e a reincidência.']],
-      ['Denunciar', ['Se vires algo que viole estas regras, contacta-nos através da página Ajuda e Contacto, indicando o perfil ou o anúncio em causa.']]
+      ['Denunciar', ['Se vires algo que viole estas regras, envia a denúncia para {{REPORT_EMAIL}}, indicando o perfil ou o anúncio em causa, a data e uma descrição do sucedido. Também podes usar a função Denunciar dentro da aplicação.']]
     ]
   },
 
@@ -72,7 +72,7 @@ const DOCS = {
       ['Sinais de burla', [['Pedem dinheiro adiantado para te dar o trabalho.', 'Pedem fotografia de documentos, códigos ou dados do banco.', 'Pressionam para decidires depressa ou para sair da aplicação.']]],
       ['Encontros presenciais', [['Marca em locais públicos, de dia, sempre que possível.', 'Avisa alguém de confiança do local e da hora.']]],
       ['A tua conta', [['Usa uma palavra-passe longa e que não uses noutros sítios.', 'Nunca partilhes a palavra-passe. O Aquipay nunca a pede.', 'Termina a sessão em dispositivos que não são teus.']]],
-      ['Aconteceu algo?', ['Guarda as mensagens e comprovativos e denuncia o perfil através da página Ajuda e Contacto.']]
+      ['Aconteceu algo?', ['Guarda as mensagens e comprovativos e denuncia o perfil através da aplicação ou escreve para {{REPORT_EMAIL}}. Se o problema envolver acesso ou segurança da tua conta, contacta também {{SUPPORT_EMAIL}}.']]
     ]
   },
 
@@ -83,7 +83,7 @@ const DOCS = {
       ['O que guardamos no dispositivo', [['A tua sessão, para não teres de iniciar sessão sempre que abres a aplicação.', 'As tuas definições, como tema, tamanho e tipo de letra.', 'Cópias de dados e ficheiros da aplicação, para que ela abra mais depressa e funcione com pouca ligação.']]],
       ['Cookies de publicidade', ['Não usamos cookies de publicidade nem de seguimento entre sites.']],
       ['Google', ['Se escolheres entrar com Google, a Google pode usar cookies próprios durante o início de sessão, segundo a política dela.']],
-      ['Como limpar', ['Em Definições, Limpar dados deste dispositivo, apagas tudo o que a aplicação guardou localmente. Terás de iniciar sessão novamente.']]
+      ['Como limpar', ['Em Definições, Limpar dados deste dispositivo, apagas tudo o que a aplicação guardou localmente. Terás de iniciar sessão novamente.']],\n      ['Dúvidas sobre privacidade', ['Para questões sobre dados pessoais, escreve para {{PRIVACY_EMAIL}}.']]
     ]
   },
 
@@ -96,7 +96,7 @@ const DOCS = {
       ['O que significa o selo de verificado?', ['A conta passou pelo processo de verificação do Aquipay. Para pedir, vai a Perfil e toca em Pedir verificação.']],
       ['Como funciona o histórico de pagamentos?', ['Quando um trabalho é concluído, quem trabalhou confirma se recebeu ou não o pagamento. Essas confirmações formam o histórico visível no perfil de quem paga.']],
       ['Como altero ou apago a minha conta?', ['Altera os dados em Perfil. Para apagar, vai a Definições e usa Pedir eliminação da conta.']],
-      ['Falar connosco', ['{{CONTACT}}']]
+      ['Apoio ao utilizador', ['Dúvidas gerais, problemas técnicos ou dificuldades com a conta: {{SUPPORT_EMAIL}}.']],\n      ['Pagamentos e contas', ['Compras, moedas, plano Plus, cobranças e reembolsos: {{ACCOUNTS_EMAIL}}.']],\n      ['Privacidade e dados pessoais', ['Pedidos sobre os teus dados pessoais: {{PRIVACY_EMAIL}}.']],\n      ['Denúncias e segurança', ['Fraude, abuso, assédio ou conteúdos indevidos: {{REPORT_EMAIL}}.']],\n      ['Parcerias', ['Propostas comerciais e parcerias: {{PARTNERSHIP_EMAIL}}.']]
     ]
   },
 
@@ -106,7 +106,7 @@ const DOCS = {
     sections: [
       ['A nossa missão', ['Tornar mais simples e mais seguro encontrar trabalho e contratar serviços em Angola, com perfis transparentes e um histórico de pagamentos que se vê antes de aceitar.']],
       ['O que podes fazer', [['Publicar trabalhos, serviços e empregos com fotografias.', 'Candidatar-te vendo antes quem está do outro lado.', 'Construir um perfil com experiência, formação e portefólio.', 'Receber classificações depois de cada trabalho concluído.']]],
-      ['Versão', ['Aquipay {{VERSION}}']]
+      ['Parcerias e contacto', ['Para propostas comerciais e parcerias, escreve para {{PARTNERSHIP_EMAIL}}. Para apoio geral, contacta {{SUPPORT_EMAIL}}.']],\n      ['Versão', ['Aquipay {{VERSION}}']]
     ]
   }
 };
@@ -122,14 +122,19 @@ function docHtml(id) {
   if (!d) return '';
   const mail = (typeof CFG !== 'undefined' && CFG.supportEmail) || '';
   const ver = (typeof APP_VERSION !== 'undefined' && APP_VERSION) || '';
-  const fill = t => t
-    .replace('{{CONTACT}}', mail ? 'Escreve para ' + mail + '. Respondemos em até 5 dias úteis.' : 'Escreve-nos através da aplicação. Respondemos em até 5 dias úteis.')
-    .replace('{{VERSION}}', ver);
+  const CONTACTS = {
+    '{{SUPPORT_EMAIL}}': 'suporte@isabstudio.dev',
+    '{{PARTNERSHIP_EMAIL}}': 'parceria@isabstudio.dev',
+    '{{PRIVACY_EMAIL}}': 'privacidade@isabstudio.dev',
+    '{{ACCOUNTS_EMAIL}}': 'contas@isabstudio.dev',
+    '{{REPORT_EMAIL}}': 'denuncia@isabstudio.dev'
+  };
+  const fill = t => Object.entries(CONTACTS).reduce((value, [token, address]) => value.replaceAll(token, address), t).replace('{{VERSION}}', ver);
   const esc2 = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const body = d.sections.map(([t, parts]) =>
-    '<h3>' + esc2(t) + '</h3>' + parts.map(p => Array.isArray(p) ? '<ul>' + p.map(li => '<li>' + esc2(li) + '</li>').join('') + '</ul>' : '<p>' + esc2(fill(p)) + '</p>').join('')
+    '<h3>' + esc2(t) + '</h3>' + parts.map(p => Array.isArray(p) ? '<ul>' + p.map(li => '<li>' + esc2(li) + '</li>').join('') + '</ul>' : '<p>' + esc2(fill(p)).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, email => '<a class="link" href="mailto:' + email + '">' + email + '</a>') + '</p>').join('')
   ).join('');
   const upd = ['sobre', 'ajuda'].includes(id) ? '' : '<p class="upd">Atualizado em ' + LEGAL_UPDATED + '</p>';
-  const cta = id === 'ajuda' && mail ? '<p><a class="btn" href="mailto:' + esc2(mail) + '">Enviar email</a></p>' : '';
+  const cta = id === 'ajuda' ? '<div class="stack"><a class="btn" href="mailto:suporte@isabstudio.dev">Contactar suporte</a><a class="btn secondary" href="mailto:contas@isabstudio.dev">Pagamentos e reembolsos</a><a class="btn secondary" href="mailto:privacidade@isabstudio.dev">Privacidade</a><a class="btn secondary" href="mailto:denuncia@isabstudio.dev">Fazer denúncia</a><a class="btn secondary" href="mailto:parceria@isabstudio.dev">Parcerias</a></div>' : '';
   return '<article class="doc"><h1>' + esc2(d.title) + '</h1>' + upd + '<p>' + esc2(d.intro) + '</p>' + body + cta + '</article>';
 }
