@@ -401,6 +401,10 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Report Android debug signing SHA-1
+        working-directory: android
+        run: ./gradlew signingReport --console=plain | grep -E 'Variant:|SHA1:'
+
       - name: Configure and validate release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -464,6 +468,9 @@ jobs:
           # Make the validated store password available to the release Gradle step
           # without exposing it in logs.
           printf 'AQUIPAY_EFFECTIVE_STORE_PASSWORD=%s\n' "$EFFECTIVE_STORE_PASSWORD" >> "$GITHUB_ENV"
+
+          echo "Release keystore SHA-1 fingerprint (safe to share with Google Cloud):"
+          keytool -list -v -keystore android/release.keystore -storepass "$EFFECTIVE_STORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep -E 'SHA1:' || true
 
           echo "Keystore, store password, alias, and private-key password validated."
 
