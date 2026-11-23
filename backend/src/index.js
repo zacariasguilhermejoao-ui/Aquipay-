@@ -228,8 +228,60 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
  if(p==='/api/auth/login'&&m==='POST'){const rl=await limited(req,env,'login',10,900);if(rl)return rl;const b=await json(req),email=clean(b.email,254).toLowerCase(),password=typeof b.password==='string'?b.password:'';const ar=await limited(req,env,'login_email_'+(await digest(email)).slice(0,18),8,900);if(ar)return ar;const x=await env.DB.prepare("SELECT id,name,email,password_hash,password_salt,status,deletion_requested_at,deletion_due_at,totp_enabled FROM users WHERE email=?").bind(email).first();if(!x||x.status!=='active'||!password||await passHash(password,x.password_salt)!==x.password_hash)return err('Email ou palavra-passe incorretos.',401);if(x.totp_enabled)return issueLoginChallenge(x.id,env);return out({user:{id:x.id,name:x.name,email:x.email,deletionRequestedAt:x.deletion_requested_at||null,deletionDueAt:x.deletion_due_at||null},...await session(x.id,env)})}
  if(p==='/api/auth/forgot'&&m==='POST'){const rl=await limited(req,env,'forgot',5,3600);if(rl)return rl;const b=await json(req,2000),email=clean(b.email,254).toLowerCase(),lang=['pt','en','fr','zh'].includes(b.lang)?b.lang:'pt';if(emailOk(email)){const x=await env.DB.prepare('SELECT id,name,status FROM users WHERE email=?').bind(email).first();if(x&&x.status==='active'){const token=b64(crypto.getRandomValues(new Uint8Array(32)));await env.DB.batch([env.DB.prepare('DELETE FROM password_resets WHERE user_id=?').bind(x.id),env.DB.prepare('INSERT INTO password_resets(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),x.id,new Date(Date.now()+3600000).toISOString())]);await sendReset(env,email,x.name,token,lang)}}return out({ok:true})}
  if(p==='/api/auth/reset'&&m==='POST'){const rl=await limited(req,env,'reset',10,3600);if(rl)return rl;const b=await json(req,2000),token=clean(b.token,200),pw=typeof b.password==='string'?b.password:'';if(pw.length<10||pw.length>200)return err('A palavra-passe deve ter pelo menos 10 caracteres.');const r=token?await env.DB.prepare('SELECT pr.user_id,pr.expires_at,u.totp_enabled,u.totp_secret,u.totp_recovery_hashes FROM password_resets pr JOIN users u ON u.id=pr.user_id WHERE pr.token_hash=?').bind(await digest(token)).first():null;if(!r||r.expires_at<new Date().toISOString())return err('Link de recuperação inválido ou expirado.');if(r.totp_enabled){const checked=await verifyAccountCode({id:r.user_id,totp_enabled:r.totp_enabled,totp_secret:r.totp_secret,totp_recovery_hashes:r.totp_recovery_hashes},b.code,env);if(!checked.ok)return err('Código do autenticador obrigatório ou incorreto.',403)}const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await passHash(pw,salt);await env.DB.batch([env.DB.prepare("UPDATE users SET password_hash=?,password_salt=? WHERE id=? AND status='active'").bind(hash,salt,r.user_id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(r.user_id),env.DB.prepare('DELETE FROM password_resets WHERE user_id=?').bind(r.user_id)]);return out({ok:true})}
+ if(p==='/api/webhooks/didit'&&m==='POST'){
+  if(!env.DIDIT_WEBHOOK_SECRET)return err('Webhook Didit não configurado.',503);
+  const ts=Number(req.headers.get('x-timestamp')||0),sig=String(req.headers.get('x-signature-v2')||'').toLowerCase();
+  if(!Number.isFinite(ts)||!ts||Math.abs(Date.now()/1000-ts)>300||!/^[a-f0-9]{64}$/.test(sig))return err('Assinatura ou data do webhook inválida.',401);
+  let payload;try{payload=await req.json()}catch{return err('JSON inválido.',400)}
+  const sortKeys=v=>Array.isArray(v)?v.map(sortKeys):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sortKeys(v[k])])):typeof v==='number'&&Number.isFinite(v)&&Number.isInteger(v)?Math.trunc(v):v;
+  const canonical=JSON.stringify(sortKeys(payload));
+  const key=await crypto.subtle.importKey('raw',enc.encode(env.DIDIT_WEBHOOK_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const mac=new Uint8Array(await crypto.subtle.sign('HMAC',key,enc.encode(canonical)));
+  const expected=Array.from(mac,x=>x.toString(16).padStart(2,'0')).join('');
+  let diff=expected.length^sig.length;for(let i=0;i<Math.max(expected.length,sig.length);i++)diff|=(expected.charCodeAt(i)||0)^(sig.charCodeAt(i)||0);
+  if(diff!==0)return err('Assinatura do webhook inválida.',401);
+  const sessionId=clean(payload.session_id||payload.sessionId||payload.session?.id,120);
+  const status=clean(payload.status||payload.decision?.status,40);
+  const event=clean(payload.webhook_type||payload.event||payload.type,'80');
+  if(!sessionId||!status)return err('Evento Didit incompleto.',400);
+  const row=await env.DB.prepare('SELECT user_id FROM identity_verifications WHERE session_id=?').bind(sessionId).first();
+  if(!row)return out({ok:true,ignored:true});
+  const eventKey=await digest(sessionId+':'+event+':'+status+':'+String(payload.timestamp||ts));
+  const inserted=await env.DB.prepare('INSERT OR IGNORE INTO identity_webhook_events(event_key,session_id,event_type) VALUES(?,?,?)').bind(eventKey,sessionId,event||'status').run();
+  if(!inserted.meta?.changes)return out({ok:true,duplicate:true});
+  const now=new Date().toISOString();
+  await env.DB.prepare('UPDATE identity_verifications SET status=?,updated_at=? WHERE session_id=?').bind(status,now,sessionId).run();
+  if(status==='Approved')await env.DB.prepare('UPDATE users SET identity_verified_at=COALESCE(identity_verified_at,?) WHERE id=?').bind(now,row.user_id).run();
+  return out({ok:true});
+ }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
  if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
+ if(p==='/api/identity/status'&&m==='GET'){
+  const [v,user]=await Promise.all([
+   env.DB.prepare('SELECT session_id,status,session_url,created_at,updated_at FROM identity_verifications WHERE user_id=? ORDER BY created_at DESC LIMIT 1').bind(me.id).first(),
+   env.DB.prepare('SELECT identity_verified_at FROM users WHERE id=?').bind(me.id).first()
+  ]);
+  const active=v&&['Not Started','In Progress','Awaiting User','In Review','Resubmitted'].includes(v.status);
+  return out({verified:!!user?.identity_verified_at,verifiedAt:user?.identity_verified_at||null,status:v?.status||'Not Started',createdAt:v?.created_at||null,updatedAt:v?.updated_at||null,sessionUrl:active?v.session_url||null:null,canStart:!user?.identity_verified_at&&!active});
+ }
+ if(p==='/api/identity/start'&&m==='POST'){
+  const rl=await limited(req,env,'identity_start',3,3600);if(rl)return rl;
+  const b=await json(req,3000);
+  if(b.consent!==true)return err('É necessário aceitar o consentimento antes de continuar.',403);
+  if(!env.DIDIT_API_KEY||!env.DIDIT_WORKFLOW_ID)return err('A integração de identidade ainda não está configurada no servidor.',503);
+  const existing=await env.DB.prepare('SELECT session_id,status,session_url FROM identity_verifications WHERE user_id=? ORDER BY created_at DESC LIMIT 1').bind(me.id).first();
+  if(existing&&['Not Started','In Progress','Awaiting User','In Review','Resubmitted'].includes(existing.status))return out({sessionId:existing.session_id,url:existing.session_url,status:existing.status});
+  const response=await fetch('https://verification.didit.me/v3/session/',{method:'POST',headers:{'x-api-key':env.DIDIT_API_KEY,'content-type':'application/json'},body:JSON.stringify({workflow_id:env.DIDIT_WORKFLOW_ID,vendor_data:me.id,callback:'https://aquipay.isabstudio.dev/?identity=return'})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){console.error('Didit session creation failed',response.status);return err('Não foi possível iniciar a verificação. Tenta novamente mais tarde.',502)}
+  const sessionId=clean(data.session_id||data.id,120),url=clean(data.url||data.session_url,2000);
+  let host='';try{const parsed=new URL(url);if(parsed.protocol==='https:')host=parsed.hostname}catch{}
+  if(!sessionId||!host||(host!=='verify.didit.me'&&!host.endsWith('.didit.me')))return err('A Didit devolveu uma sessão inválida.',502);
+  const now=new Date().toISOString();
+  await env.DB.prepare('INSERT INTO identity_verifications(id,user_id,session_id,status,session_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(uid(),me.id,sessionId,'In Progress',url,now,now).run();
+  return out({sessionId,url,status:'In Progress'},201);
+ }
+
  if(p==='/api/me/deletion'&&m==='GET')return out({deletionRequestedAt:me.deletion_requested_at||null,deletionDueAt:me.deletion_due_at||null});
  if(p==='/api/me/deletion/cancel'&&m==='POST'){await env.DB.prepare('UPDATE users SET deletion_requested_at=NULL,deletion_due_at=NULL WHERE id=? AND status=\'active\'').bind(me.id).run();return out({ok:true})}
  if(p==='/api/security/status'&&m==='GET'){
