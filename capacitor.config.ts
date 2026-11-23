@@ -8,6 +8,7 @@ const config: CapacitorConfig = {
     androidScheme: 'https'
   },
   plugins: {
+    SocialLogin: { providers: { google: true, facebook: false, apple: false, twitter: false } },
     SplashScreen: {
       launchShowDuration: 2000,
       backgroundColor: '#000000',
