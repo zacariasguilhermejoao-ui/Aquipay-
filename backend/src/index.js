@@ -259,19 +259,29 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   return out({ok:true});
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
- // Rede profissional: diretório público, seguidores e perfis seguidos.
- if(p==='/api/network'&&m==='GET'){
-  const q=clean(u.searchParams.get('q'),80),profession=clean(u.searchParams.get('profession'),80);
-  const rows=await env.DB.prepare("SELECT u.id,u.name,p.city,p.bio,p.professions_json,p.skills_json,CASE WHEN p.avatar_key IS NOT NULL THEN '/api/avatars/'||u.id ELSE NULL END avatar_url,(SELECT COUNT(*) FROM user_follows f WHERE f.followed_id=u.id) followers_count,(SELECT COUNT(*) FROM user_follows f WHERE f.follower_id=u.id) following_count,EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_id=? AND f.followed_id=u.id) is_following FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id<>? AND u.status='active' AND u.deletion_requested_at IS NULL AND p.public_profile=1 AND (?='' OR u.name LIKE '%'||?||'%' OR p.city LIKE '%'||?||'%' OR p.bio LIKE '%'||?||'%' OR p.professions_json LIKE '%'||?||'%' OR p.skills_json LIKE '%'||?||'%') AND (?='' OR p.professions_json LIKE '%'||?||'%') AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id=?) AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id=?) ORDER BY is_following DESC,followers_count DESC,u.name LIMIT 60").bind(me.id,me.id,q,q,q,q,q,q,profession,profession,me.id,me.id).all();
-  return out({users:rows.results});
- }
- if(p==='/api/follows'&&m==='GET'){
-  const rows=await env.DB.prepare("SELECT u.id,u.name,p.city,p.professions_json,CASE WHEN p.avatar_key IS NOT NULL THEN '/api/avatars/'||u.id ELSE NULL END avatar_url,(SELECT COUNT(*) FROM user_follows f WHERE f.followed_id=u.id) followers_count FROM user_follows mine JOIN users u ON u.id=mine.followed_id JOIN profiles p ON p.user_id=u.id WHERE mine.follower_id=? AND u.status='active' AND u.deletion_requested_at IS NULL ORDER BY mine.created_at DESC").bind(me.id).all();
-  return out({users:rows.results});
- }
- const followMatch=p.match(new RegExp('^/api/follows/([\\w-]+) if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
- if(p==='/api/onboarding/complete'&&m==='POST'){const now=new Date().toISOString();await env.DB.prepare('UPDATE users SET onboarding_completed_at=COALESCE(onboarding_completed_at,?) WHERE id=?').bind(now,me.id).run();return out({ok:true,completedAt:now})}
- if(p==='/api/usage'&&m==='GET'){const plusActive=await plusIsActive(env,me.id),dayStart=angolaPeriodStart('day'),monthStart=angolaPeriodStart('month');const [a,l]=await Promise.all([env.DB.prepare('SELECT COUNT(*) n FROM proposals WHERE sender_id=? AND created_at>=?').bind(me.id,dayStart).first(),env.DB.prepare('SELECT COUNT(*) n FROM listings WHERE owner_id=? AND created_at>=?').bind(me.id,monthStart).first()]);return out({plusActive,applicationsToday:Number(a?.n||0),postsThisMonth:Number(l?.n||0),freeApplicationsPerDay:5,freePostsPerMonth:10})}
+if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
+// Rede profissional: diretório público, seguidores e perfis seguidos.
+if(p==='/api/network'&&m==='GET'){
+ const q=clean(u.searchParams.get('q'),80),profession=clean(u.searchParams.get('profession'),80);
+ const rows=await env.DB.prepare("SELECT u.id,u.name,p.city,p.bio,p.professions_json,p.skills_json,CASE WHEN p.avatar_key IS NOT NULL THEN '/api/avatars/'||u.id ELSE NULL END avatar_url,(SELECT COUNT(*) FROM user_follows f WHERE f.followed_id=u.id) followers_count,(SELECT COUNT(*) FROM user_follows f WHERE f.follower_id=u.id) following_count,EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_id=? AND f.followed_id=u.id) is_following FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id<>? AND u.status='active' AND u.deletion_requested_at IS NULL AND p.public_profile=1 AND (?='' OR u.name LIKE '%'||?||'%' OR p.city LIKE '%'||?||'%' OR p.bio LIKE '%'||?||'%' OR p.professions_json LIKE '%'||?||'%' OR p.skills_json LIKE '%'||?||'%') AND (?='' OR p.professions_json LIKE '%'||?||'%') AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id=?) AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id=?) ORDER BY is_following DESC,followers_count DESC,u.name LIMIT 60").bind(me.id,me.id,q,q,q,q,q,q,profession,profession,me.id,me.id).all();
+ return out({users:rows.results});
+}
+if(p==='/api/follows'&&m==='GET'){
+ const rows=await env.DB.prepare("SELECT u.id,u.name,p.city,p.professions_json,CASE WHEN p.avatar_key IS NOT NULL THEN '/api/avatars/'||u.id ELSE NULL END avatar_url,(SELECT COUNT(*) FROM user_follows f WHERE f.followed_id=u.id) followers_count FROM user_follows mine JOIN users u ON u.id=mine.followed_id JOIN profiles p ON p.user_id=u.id WHERE mine.follower_id=? AND u.status='active' AND u.deletion_requested_at IS NULL ORDER BY mine.created_at DESC").bind(me.id).all();
+ return out({users:rows.results});
+}
+if(p.startsWith('/api/follows/')&&(m==='POST'||m==='DELETE')){
+ const target=decodeURIComponent(p.slice('/api/follows/'.length));if(!/^[\\w-]{1,80}$/.test(target)||target===me.id)return err('Perfil inválido para seguir.',400);
+ const person=await env.DB.prepare("SELECT u.id,u.name FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND u.status='active' AND u.deletion_requested_at IS NULL AND p.public_profile=1").bind(target).first();
+ if(!person)return err('Este perfil não está disponível para seguir.',404);
+ if(await env.DB.prepare('SELECT 1 ok FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').bind(me.id,target,target,me.id).first())return err('Não é possível criar esta ligação entre perfis.',403);
+ if(m==='POST'){await env.DB.prepare('INSERT OR IGNORE INTO user_follows(follower_id,followed_id) VALUES(?,?)').bind(me.id,target).run();await notice(env,target,'follow','Novo seguidor',me.name+' começou a seguir o teu perfil.',{followerId:me.id});}
+ else await env.DB.prepare('DELETE FROM user_follows WHERE follower_id=? AND followed_id=?').bind(me.id,target).run();
+ const count=await env.DB.prepare('SELECT COUNT(*) n FROM user_follows WHERE followed_id=?').bind(target).first();
+ return out({ok:true,following:m==='POST',followersCount:Number(count?.n||0)},m==='POST'?201:200);
+}
+if(p==='/api/onboarding/complete'&&m==='POST'){const now=new Date().toISOString();await env.DB.prepare('UPDATE users SET onboarding_completed_at=COALESCE(onboarding_completed_at,?) WHERE id=?').bind(now,me.id).run();return out({ok:true,completedAt:now})}
+if(p==='/api/usage'&&m==='GET'){const plusActive=await plusIsActive(env,me.id),dayStart=angolaPeriodStart('day'),monthStart=angolaPeriodStart('month');const [a,l]=await Promise.all([env.DB.prepare('SELECT COUNT(*) n FROM proposals WHERE sender_id=? AND created_at>=?').bind(me.id,dayStart).first(),env.DB.prepare('SELECT COUNT(*) n FROM listings WHERE owner_id=? AND created_at>=?').bind(me.id,monthStart).first()]);return out({plusActive,applicationsToday:Number(a?.n||0),postsThisMonth:Number(l?.n||0),freeApplicationsPerDay:5,freePostsPerMonth:10})}
  if(p==='/api/identity/status'&&m==='GET'){
   const [v,user]=await Promise.all([
    env.DB.prepare('SELECT session_id,status,session_url,created_at,updated_at FROM identity_verifications WHERE user_id=? ORDER BY created_at DESC LIMIT 1').bind(me.id).first(),
