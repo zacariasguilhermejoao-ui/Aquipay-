@@ -85,7 +85,7 @@ async function shrink(f,max=S.st.saver==='on'?800:1280){const bm=await createIma
 const av=(u,s)=>`<div class="av" style="width:${s}px;height:${s}px;font-size:${s*.38}px">${u.foto?`<img src="${src(u.foto)}" alt="">`:u.avatarUrl?`<img src="${esc(u.avatarUrl)}" alt="">`:esc((u.nome||'?').slice(0,2).toUpperCase())}</div>`;
 async function notify(uid,txt,kind='candidaturas'){const n={id:nid(),uid,txt,at:Date.now(),read:false};S.notifs.push(n);put('notifs',n);if(S.me&&uid===S.me.id){if(S.st.notif?.[kind]!==false&&document.hidden&&'Notification'in window&&Notification.permission==='granted'){const r=await navigator.serviceWorker.ready;r.showNotification('Aquipay',{body:T(txt),icon:'icon-192.png',badge:'icon-192.png'})}if(S.v==='home')render()}}
 const unread=()=>S.notifs.filter(n=>n.uid===S.me.id&&!n.read).length;
-const unreadMessages=()=>S.messages.filter(m=>m.to===S.me.id&&!m.read).length;
+const unreadMessages=()=>S.messages.filter(m=>m.to===S.me.id&&!m.read).length+(S.conversations||[]).reduce((n,c)=>n+Number(c.unread_count||0),0);
 
 /* reputação */
 function stats(id){const r=S.reviews.filter(x=>x.ownerId===id&&x.type!=='rating'),p=r.filter(x=>x.paid).length,ratings=S.reviews.filter(x=>x.type==='rating'&&x.targetId===id);return{n:r.length,p,pct:r.length?Math.round(p/r.length*100):null,list:r.slice(-5).reverse(),ratingCount:ratings.length,ratingAvg:ratings.length?ratings.reduce((a,x)=>a+x.stars,0)/ratings.length:0,ratingList:ratings.slice(-5).reverse()}}
