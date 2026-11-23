@@ -201,9 +201,11 @@ jobs:
           keystore.write_bytes(base64.b64decode(encoded, validate=True))
 
           gradle = Path("android/app/build.gradle")
-          source = gradle.read_text()
-          if "\\\\n" in source:
-              raise SystemExit("Literal backslash-n marker found in android/app/build.gradle")
+          source = gradle.read_text(encoding="utf-8")
+
+          # Replace every accidental literal backslash-n marker with a real newline.
+          source = source.replace("\\n", "\n")
+
           signing = """
           android {
               signingConfigs {
@@ -221,9 +223,18 @@ jobs:
               }
           }
           """
+
+          # Rewrite the entire generated Gradle file as UTF-8 Groovy source.
           if "signingConfigs" not in source:
-              gradle.write_text(source + "\\n" + signing)
-          print("Release signing configuration prepared without exposing secrets.")
+              source = source.rstrip() + "\n\n" + signing.strip() + "\n"
+          else:
+              source = source.rstrip() + "\n"
+
+          if "\\n" in source:
+              raise SystemExit("Literal backslash-n remains in android/app/build.gradle")
+
+          gradle.write_text(source, encoding="utf-8", newline="\n")
+          print("android/app/build.gradle rewritten; signing secrets remain environment-only.")
           PY
 
       - name: Build APK (debug)
