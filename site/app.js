@@ -54,7 +54,7 @@ const STORES=['users','vagas','cands','notifs','reviews','messages','kv'];
 const idb=new Promise((ok,ko)=>{const r=indexedDB.open('aquipay',2);r.onupgradeneeded=()=>STORES.forEach(s=>{if(!r.result.objectStoreNames.contains(s))r.result.createObjectStore(s,{keyPath:'id'})});r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
 const tx=(s,m,f)=>idb.then(d=>new Promise((ok,ko)=>{const t=d.transaction(s,m),q=f(t.objectStore(s));t.oncomplete=()=>ok(q&&q.result);t.onerror=()=>ko(t.error)}));
 const put=(s,v)=>tx(s,'readwrite',o=>o.put(v));
-const S={ready:false,me:null,v:'home',tab:'vagas',pics:[],users:[],vagas:[],cands:[],notifs:[],reviews:[],messages:[],documents:[],remotePeople:[],searchText:'',shared:null,st:{id:'settings',theme:'auto',font:'padrao',size:100,motion:'auto',saver:'off',notif:{candidaturas:true,pagamentos:true,mensagens:true,novidades:true,novidadesExplicit:false}}};
+const S={ready:false,me:null,v:'home',tab:'vagas',pics:[],users:[],vagas:[],cands:[],notifs:[],reviews:[],messages:[],documents:[],remotePeople:[],searchText:'',shared:null,pendingShare:null,st:{id:'settings',theme:'auto',font:'padrao',size:100,motion:'auto',saver:'off',notif:{candidaturas:true,pagamentos:true,mensagens:true,novidades:true,novidadesExplicit:false}}};
 async function api(path,options={}){const headers=new Headers(options.headers||{});if(S.me?.apiToken)headers.set('authorization','Bearer '+S.me.apiToken);if(options.body&&!(options.body instanceof FormData))headers.set('content-type','application/json');let r;try{r=await fetch(CFG.apiBase+path,{...options,headers})}catch{throw new Error('Sem ligação ao servidor. Verifica a internet e tenta novamente.')}let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||'Não foi possível comunicar com o servidor.');return data}
 async function syncProfile(){if(!S.me?.apiToken)return;const u=S.me;try{await api('/api/profile',{method:'PATCH',body:JSON.stringify({name:u.nome,city:u.cidade||'',phone:u.tel||'',bio:u.bio||'',professions:u.professions||[],skills:u.skills||[],portfolio:u.portfolio||[],experience:u.experience||[],education:u.education||[],publicProfile:u.publicProfile!==false})})}catch{toast('Perfil guardado. Não foi possível sincronizar com o servidor.')}}
 const U=i=>S.users.find(u=>u.id===i);
@@ -196,6 +196,50 @@ const urlKey=k=>Uint8Array.from(atob((k+'='.repeat((4-k.length%4)%4)).replace(/-
 const nativePushPlugin=()=>window.AquipayNativePush||window.Capacitor?.Plugins?.PushNotifications;
 const isNativeApp=()=>!!(window.Capacitor?.isNativePlatform?.()||window.Capacitor?.getPlatform?.()==='android');
 let nativePushListeners=false,nativeFcmToken='';
+
+/* Receber conteúdo partilhado de outras aplicações (Android e PWA). */
+async function consumeIncomingShare(payload){
+  if(!payload)return;
+  if(!S.me){S.pendingShare=payload;toast('Inicia sessão para continuar com o conteúdo partilhado.');return}
+  S.pendingShare=null;
+  const text=String(payload.text||'').trim(),url=String(payload.url||'').trim();
+  const title=String(payload.title||'').trim();
+  const description=[text,url].filter(Boolean).join('\\n');
+  const files=Array.isArray(payload.files)?payload.files:[];
+  const imported=[];
+  for(const file of files.slice(0,4)){
+    try{
+      if(!file.path||!String(file.mimeType||'').startsWith('image/'))continue;
+      const localUrl=window.Capacitor?.convertFileSrc?window.Capacitor.convertFileSrc(file.path):file.path;
+      const response=await fetch(localUrl);
+      if(!response.ok)continue;
+      const blob=await response.blob();
+      if(blob.type.startsWith('image/'))imported.push(await shrink(blob));
+    }catch{}
+  }
+  S.pics=imported.slice(0,4);
+  go('pub');
+  setTimeout(()=>{
+    const titleField=$('pt'),descField=$('pd');
+    if(titleField&&!titleField.value)titleField.value=(title||text||url).slice(0,120);
+    if(descField&&!descField.value)descField.value=description.slice(0,3000);
+    thumbs();
+  },80);
+  toast('Conteúdo recebido. Confere os dados antes de publicar.');
+}
+function setupShareReceiver(){
+  const plugin=window.Capacitor?.Plugins?.ShareReceiver;
+  if(!plugin)return;
+  plugin.addListener('shareReceived',data=>{
+    if(S.me)consumeIncomingShare(data);else{S.pendingShare=data;toast('Inicia sessão para continuar com o conteúdo partilhado.')}
+  }).catch(()=>{});
+  plugin.getPendingShare().then(data=>{
+    if(data&&(data.text||data.url||(data.files&&data.files.length))){
+      if(S.me)consumeIncomingShare(data);else S.pendingShare=data;
+    }
+  }).catch(()=>{});
+}
+
 async function syncNativePush(requestPermission=false){
   const plugin=nativePushPlugin();if(!plugin||!S.me?.apiToken)return false;
   try{let permission=await plugin.checkPermissions();
@@ -232,7 +276,10 @@ async function refreshData(){
   render();
 }
 
-async function enter(u){S.me=u;S.v='home';await put('kv',{id:'session',uid:u.id});render();if(u.deletionRequestedAt)return;syncPush();syncBlocks();refreshData().catch(()=>{})}
+async function enter(u){S.me=u;S.v='home';await put('kv',{id:'session',uid:u.id});render();if(u.deletionRequestedAt)return;syncPush();syncBlocks();refreshData().catch(()=>{});if(S.pendingShare)consumeIncomingShare(S.pendingShare)}
+document.addEventListener('contextmenu',e=>{if(e.target.closest('img,.ph,.av'))e.preventDefault()});
+document.addEventListener('dragstart',e=>{if(e.target.closest('img'))e.preventDefault()});
+document.addEventListener('selectstart',e=>{if(!e.target.closest('input,textarea,select,[contenteditable="true"],.linkbox'))e.preventDefault()});
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const b=e.target.closest('.btn');if(b){const r=b.getBoundingClientRect(),s=Math.max(r.width,r.height)*2,d=document.createElement('span');d.className='rp';d.style.cssText=`width:${s}px;height:${s}px;left:${e.clientX-r.left-s/2}px;top:${e.clientY-r.top-s/2}px`;b.appendChild(d);setTimeout(()=>d.remove(),600)}e.preventDefault();A[el.dataset.a]&&A[el.dataset.a](el)});
 let searchTimer;document.addEventListener('input',e=>{if(e.target.id==='publicSearch'){const q=e.target.value.trim(),box=$('publicResults');if(!box)return;clearTimeout(searchTimer);if(q.length<2){box.innerHTML='<p class="mut">Escreve pelo menos 2 caracteres.</p>';return}searchTimer=setTimeout(async()=>{try{const d=await fetch(CFG.apiBase+'/api/users?q='+encodeURIComponent(q),{headers:authH()}).then(r=>r.json());box.innerHTML=(d.users||[]).filter(u=>!remoteBlocked(u.id)).map(u=>`<div class="card ho"><div class="av">${esc((u.name||'?').slice(0,2).toUpperCase())}</div><div style="flex:1"><b>${esc(u.name)}</b><small>${esc(u.city||'')}</small></div><button class="btn secondary" style="width:auto" data-a="viewProfile" data-id="${u.id}">Ver perfil</button></div>`).join('')||'<p class="mut">Nenhum perfil público encontrado.</p>'}catch{box.innerHTML='<p class="mut">Não foi possível pesquisar agora.</p>'}},250)}if(e.target.id==='globalSearch'){S.searchText=e.target.value;const f=$('feed');if(f)f.innerHTML=feed();clearTimeout(searchTimer);const q=S.searchText.trim();if(q.length>=2){searchTimer=setTimeout(async()=>{try{const d=await fetch(CFG.apiBase+'/api/users?q='+encodeURIComponent(q),{headers:authH()}).then(r=>r.json());S.remotePeople=(d.users||[]).filter(u=>!remoteBlocked(u.id));const box=$('feed');if(box&&S.remotePeople.length){box.insertAdjacentHTML('beforeend',`<h4>Perfis encontrados</h4>${S.remotePeople.map(u=>`<div class="card ho"><div class="av">${esc((u.name||'?').slice(0,2).toUpperCase())}</div><div style="flex:1"><b>${esc(u.name)}</b><small>${esc(u.city||'')}</small></div><button class="btn secondary" style="width:auto" data-a="viewProfile" data-id="${u.id}">Ver perfil</button></div>`).join('')}`)}}catch{}},250)}else S.remotePeople=[]}});
 document.addEventListener('change',e=>{const g=e.target.dataset.set;if(g){const on=e.target.checked;if(g==='publicProfile'){S.me.publicProfile=on;saveUser(S.me).then(syncProfile)}else if(g.startsWith('notif.')){const key=g.slice(6);S.st.notif={...S.st.notif,[key]:on,...(key==='novidades'?{novidadesExplicit:true}:{})};put('kv',S.st);syncPush()}return}const k=e.target.dataset.k;if(!k)return;if(k==='lang'){A.lang({dataset:{id:e.target.value}});return}S.st[k]=k==='size'?+e.target.value:e.target.value;put('kv',S.st);theme()});
@@ -247,6 +294,6 @@ let pullStartY=0,pullBusy=false;document.addEventListener('touchstart',e=>{const
 addEventListener('online',()=>toast('Ligação restabelecida'));addEventListener('offline',()=>toast('Sem ligação. Podes continuar a usar o Aquipay.'));
 
 /* arranque */
-(async()=>{render();try{const[us,vs,cs,ns,rs,ms,kv]=await Promise.all(['users','vagas','cands','notifs','reviews','messages','kv'].map(s=>tx(s,'readonly',o=>o.getAll())));Object.assign(S,{users:us,vagas:vs,cands:cs,notifs:ns,reviews:rs,messages:ms});const st=kv.find(x=>x.id==='settings');if(st)Object.assign(S.st,st);S.st.notif={...S.st.notif};if(!S.st.notif.novidadesExplicit){S.st.notif.novidades=true;put('kv',S.st)}const ss=kv.find(x=>x.id==='session');S.me=ss&&ss.uid?U(ss.uid)||null:null}catch{}const rt=new URLSearchParams(location.search).get('reset');if(rt){S.resetToken=rt;S.v='reset';history.replaceState(null,'','/')}const slug=location.pathname.replace(/^\/+|\/+$/g,'');if(typeof DOCS!=='undefined'&&DOCS[slug]){S.v='doc';S.doc=slug}else if(slug){S.v='notfound'}const token=new URLSearchParams(location.search).get('share');if(token){S.shared=decodeShare(token);if(!S.shared)S.shared={type:'invalid'};const rb=document.createElement('meta');rb.name='robots';rb.content='noindex,nofollow';document.head.appendChild(rb);if(S.shared.title||S.shared.name)document.title=(S.shared.title||S.shared.name)+' · Aquipay'}theme();S.ready=true;render();if(S.me?.apiToken){syncPush();syncBlocks();refreshData().catch(()=>{})}})();
+(async()=>{render();try{const[us,vs,cs,ns,rs,ms,kv]=await Promise.all(['users','vagas','cands','notifs','reviews','messages','kv'].map(s=>tx(s,'readonly',o=>o.getAll())));Object.assign(S,{users:us,vagas:vs,cands:cs,notifs:ns,reviews:rs,messages:ms});const st=kv.find(x=>x.id==='settings');if(st)Object.assign(S.st,st);S.st.notif={...S.st.notif};if(!S.st.notif.novidadesExplicit){S.st.notif.novidades=true;put('kv',S.st)}const ss=kv.find(x=>x.id==='session');S.me=ss&&ss.uid?U(ss.uid)||null:null}catch{}const rt=new URLSearchParams(location.search).get('reset');if(rt){S.resetToken=rt;S.v='reset';history.replaceState(null,'','/')}const slug=location.pathname.replace(/^\/+|\/+$/g,'');if(typeof DOCS!=='undefined'&&DOCS[slug]){S.v='doc';S.doc=slug}else if(slug){S.v='notfound'}const incomingParams=new URLSearchParams(location.search);if(incomingParams.has('text')||incomingParams.has('url')||incomingParams.has('title')){S.pendingShare={title:incomingParams.get('title')||'',text:incomingParams.get('text')||'',url:incomingParams.get('url')||'',files:[]};history.replaceState(null,'',location.pathname||'/')}const token=new URLSearchParams(location.search).get('share');if(token){S.shared=decodeShare(token);if(!S.shared)S.shared={type:'invalid'};const rb=document.createElement('meta');rb.name='robots';rb.content='noindex,nofollow';document.head.appendChild(rb);if(S.shared.title||S.shared.name)document.title=(S.shared.title||S.shared.name)+' · Aquipay'}theme();S.ready=true;render();setupShareReceiver();if(S.me?.apiToken){syncPush();syncBlocks();refreshData().catch(()=>{})}if(S.pendingShare&&S.me)consumeIncomingShare(S.pendingShare)})();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.me?.apiToken&&!S.me.deletionRequestedAt)refreshData().catch(()=>{})});
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
