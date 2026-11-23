@@ -184,7 +184,7 @@ async toggleBiometric(){
 },
 async unlockApp(){
  const sec=window.AquipayNativeSecurity;if(!sec||!S.lockedUser)return;
- try{await sec.authenticate();const token=await sec.secureGet('aquipay.session.'+S.lockedUser.id);if(!token)throw Error('Sessão segura não encontrada. Inicia sessão novamente.');S.me={...S.lockedUser,apiToken:token};S.users=S.users.map(x=>x.id===S.me.id?S.me:x);S.lockedUser=null;S.biometricLocked=false;S.v='home';render();syncPush();syncBlocks();refreshData().catch(()=>{})}catch(e){toast(e.message||'Autenticação biométrica cancelada.')}
+ try{await sec.authenticate();const token=await sec.secureGet('aquipay.session.'+S.lockedUser.id);if(!token)throw Error('Sessão segura não encontrada. Inicia sessão novamente.');S.me={...S.lockedUser,apiToken:token};const safe={...S.me};delete safe.apiToken;S.users=S.users.map(x=>x.id===S.me.id?safe:x);S.lockedUser=null;S.biometricLocked=false;S.v='home';render();syncPush();syncBlocks();refreshData().catch(()=>{})}catch(e){toast(e.message||'Autenticação biométrica cancelada.')}
 },
 async revokeOthers(){try{await api('/api/security/sessions/revoke-others',{method:'POST',body:JSON.stringify({})});await A.refreshSecurity();toast('As outras sessões foram terminadas.')}catch(e){toast(e.message)}},
 async revokeSession(el){try{await api('/api/security/sessions/'+encodeURIComponent(el.dataset.id),{method:'DELETE'});await A.refreshSecurity();toast('Sessão terminada.')}catch(e){toast(e.message)}},
@@ -251,7 +251,7 @@ blockUser(el){const d=el.dataset,u=d.id?U(d.id):null,name=u?u.nome:(d.name||T('U
 async doBlock(el){const d=el.dataset,u=d.id?U(d.id):null,cid=d.cid||(u&&u.cloudId)||'',id=u?u.id:cid;if(!id)return closeSheet();const l=myBlocks().filter(b=>b.id!==id);l.push({id,cloudId:cid||null,name:d.name||(u&&u.nome)||''});await saveBlocks(l);if(cid&&S.me.apiToken){try{await api('/api/blocks',{method:'POST',body:JSON.stringify({userId:cid})})}catch{}}closeSheet();render();toast('Utilizador bloqueado.')},
 blockedList(){const l=myBlocks();sheet(`<h3 style="margin-bottom:.8rem">Utilizadores bloqueados</h3>${l.length?l.map(b=>`<div class="card ho"><div style="flex:1"><b>${esc(b.name||T('Utilizador'))}</b></div><button class="btn secondary" style="width:auto" data-a="unblock" data-id="${esc(b.id)}">Desbloquear</button></div>`).join(''):'<p class="mut">Não bloqueaste ninguém.</p>'}`)},
 async unblock(el){const b=myBlocks().find(x=>x.id===el.dataset.id);await saveBlocks(myBlocks().filter(x=>x.id!==el.dataset.id));if(b&&b.cloudId&&S.me.apiToken){try{await api('/api/blocks/'+encodeURIComponent(b.cloudId),{method:'DELETE'})}catch{}}A.blockedList();toast('Utilizador desbloqueado.')},
-async logout(){closeSheet();if(S.me&&nativeSecurity()){await nativeSecurity().secureRemove('aquipay.session.'+S.me.id).catch(()=>{});await nativeSecurity().secureRemove('aquipay.biometric.'+S.me.id).catch(()=>{});S.biometricEnabled=false}if(S.me?.apiToken){if(nativeFcmToken){try{await api('/api/push/fcm/unregister',{method:'POST',body:JSON.stringify({token:nativeFcmToken})})}catch{}}try{const sb=await(await navigator.serviceWorker.ready).pushManager.getSubscription();if(sb)await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sb.endpoint})})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}}S.me=null;S.v='home';await put('kv',{id:'session',uid:null});render()}};
+async logout(){closeSheet();if(S.me&&nativeSecurity()){const id=S.me.id;await nativeSecurity().secureRemove('aquipay.session.'+id).catch(()=>{});await nativeSecurity().secureRemove('aquipay.biometric.'+id).catch(()=>{});S.users=S.users.map(x=>{if(x.id!==id)return x;const safe={...x};delete safe.apiToken;return safe});S.biometricEnabled=false}if(S.me?.apiToken){if(nativeFcmToken){try{await api('/api/push/fcm/unregister',{method:'POST',body:JSON.stringify({token:nativeFcmToken})})}catch{}}try{const sb=await(await navigator.serviceWorker.ready).pushManager.getSubscription();if(sb)await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sb.endpoint})})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}}S.me=null;S.v='home';await put('kv',{id:'session',uid:null});render()}};
 const urlKey=k=>Uint8Array.from(atob((k+'='.repeat((4-k.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 const nativePushPlugin=()=>window.AquipayNativePush||window.Capacitor?.Plugins?.PushNotifications;
 const isNativeApp=()=>!!(window.Capacitor?.isNativePlatform?.()||window.Capacitor?.getPlatform?.()==='android');
@@ -263,14 +263,15 @@ async function persistNativeSession(user){
 }
 async function restoreNativeSession(){
  const sec=nativeSecurity();if(!sec||!S.me)return;
- const user=S.me;
+ const user={...S.me};
  let token=await sec.secureGet('aquipay.session.'+user.id).catch(()=>null);
  if(user.apiToken&&!token){token=user.apiToken;await sec.secureSet('aquipay.session.'+user.id,token)}
- if(user.apiToken){const safe={...user};delete safe.apiToken;await saveUser(safe)}
+ const safe={...user};delete safe.apiToken;await saveUser(safe);
+ S.users=S.users.map(x=>x.id===user.id?safe:x);S.me=safe;
  const enabled=(await sec.secureGet('aquipay.biometric.'+user.id).catch(()=>null))==='true';
  S.biometricEnabled=enabled;
- if(enabled){S.lockedUser={...user};delete S.lockedUser.apiToken;S.me=null;S.biometricLocked=true;return}
- if(token)user.apiToken=token;else{S.me=null;await put('kv',{id:'session',uid:null})}
+ if(enabled){S.lockedUser={...safe};S.me=null;S.biometricLocked=true;return}
+ if(token)S.me={...safe,apiToken:token};else{S.me=null;await put('kv',{id:'session',uid:null})}
 }
 
 let nativePushListeners=false,nativeFcmToken='';
@@ -354,7 +355,7 @@ async function refreshData(){
   render();
 }
 
-async function enter(u){S.me=u;S.v='home';try{await persistNativeSession(u)}catch(e){toast('Não foi possível proteger a sessão neste dispositivo.');console.error(e)}await put('kv',{id:'session',uid:u.id});render();if(u.deletionRequestedAt)return;syncPush();syncBlocks();refreshData().catch(()=>{});if(S.pendingShare)consumeIncomingShare(S.pendingShare)}
+async function enter(u){S.me=u;S.v='home';try{await persistNativeSession(u);if(nativeSecurity()){const safe={...u};delete safe.apiToken;S.users=S.users.map(x=>x.id===u.id?safe:x)}}catch(e){toast('Não foi possível proteger a sessão neste dispositivo.');console.error(e)}await put('kv',{id:'session',uid:u.id});render();if(u.deletionRequestedAt)return;syncPush();syncBlocks();refreshData().catch(()=>{});if(S.pendingShare)consumeIncomingShare(S.pendingShare)}
 document.addEventListener('contextmenu',e=>{if(e.target.closest('img,.ph,.av'))e.preventDefault()});
 document.addEventListener('dragstart',e=>{if(e.target.closest('img'))e.preventDefault()});
 document.addEventListener('selectstart',e=>{if(!e.target.closest('input,textarea,select,[contenteditable="true"],.linkbox'))e.preventDefault()});
@@ -373,5 +374,5 @@ addEventListener('online',()=>toast('Ligação restabelecida'));addEventListener
 
 /* arranque */
 (async()=>{render();try{const[us,vs,cs,ns,rs,ms,kv]=await Promise.all(['users','vagas','cands','notifs','reviews','messages','kv'].map(s=>tx(s,'readonly',o=>o.getAll())));Object.assign(S,{users:us,vagas:vs,cands:cs,notifs:ns,reviews:rs,messages:ms});const st=kv.find(x=>x.id==='settings');if(st)Object.assign(S.st,st);S.st.notif={...S.st.notif};if(!S.st.notif.novidadesExplicit){S.st.notif.novidades=true;put('kv',S.st)}const ss=kv.find(x=>x.id==='session');S.me=ss&&ss.uid?U(ss.uid)||null:null;await restoreNativeSession()}catch{}const rt=new URLSearchParams(location.search).get('reset');if(rt){S.resetToken=rt;S.v='reset';history.replaceState(null,'','/')}const slug=location.pathname.replace(/^\/+|\/+$/g,'');if(typeof DOCS!=='undefined'&&DOCS[slug]){S.v='doc';S.doc=slug}else if(slug){S.v='notfound'}const incomingParams=new URLSearchParams(location.search);if(incomingParams.has('text')||incomingParams.has('url')||incomingParams.has('title')){S.pendingShare={title:incomingParams.get('title')||'',text:incomingParams.get('text')||'',url:incomingParams.get('url')||'',files:[]};history.replaceState(null,'',location.pathname||'/')}const token=new URLSearchParams(location.search).get('share');if(token){S.shared=decodeShare(token);if(!S.shared)S.shared={type:'invalid'};const rb=document.createElement('meta');rb.name='robots';rb.content='noindex,nofollow';document.head.appendChild(rb);if(S.shared.title||S.shared.name)document.title=(S.shared.title||S.shared.name)+' · Aquipay'}theme();S.ready=true;render();setupShareReceiver();if(S.me?.apiToken){syncPush();syncBlocks();refreshData().catch(()=>{})}if(S.pendingShare&&S.me)consumeIncomingShare(S.pendingShare)})();
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&S.me?.apiToken&&S.biometricEnabled&&isNativeApp()){S.lockedUser={...S.me};delete S.lockedUser.apiToken;S.me=null;S.biometricLocked=true;render();return}if(!document.hidden&&S.biometricLocked){render();return}if(!document.hidden&&S.me?.apiToken&&!S.me.deletionRequestedAt)refreshData().catch(()=>{})});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&S.me?.apiToken&&S.biometricEnabled&&isNativeApp()){const id=S.me.id;S.lockedUser={...S.me};delete S.lockedUser.apiToken;S.users=S.users.map(x=>{if(x.id!==id)return x;const safe={...x};delete safe.apiToken;return safe});S.me=null;S.biometricLocked=true;render();return}if(!document.hidden&&S.biometricLocked){render();return}if(!document.hidden&&S.me?.apiToken&&!S.me.deletionRequestedAt)refreshData().catch(()=>{})});
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
