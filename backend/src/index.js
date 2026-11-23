@@ -260,8 +260,8 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   return out({ok:true});
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
-if(p==='/api/billing/google/verify'&&m==='POST')return handleGooglePlayBilling(req,env,me);
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
+if(p==='/api/billing/google/verify'&&m==='POST')return handleGooglePlayBilling(req,env,me);
 // Correspondência de contactos: os números recebidos são usados apenas em memória e nunca são guardados.
 if(p==='/api/contacts/match'&&m==='POST'){
  const rl=await limited(req,env,'contacts_match',8,3600);if(rl)return rl;
