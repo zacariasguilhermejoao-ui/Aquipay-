@@ -161,8 +161,8 @@ const profilePublic=u=>u.publicProfile!==false;
 
 /* ações */
 const A={
-async openIdentity(){try{S.identityStatus=await api('/api/identity/status');if(S.me){S.me.identityVerified=!!S.identityStatus.verified;await saveUser(S.me)}go('identity')}catch(e){toast(e.message)}},
-async refreshIdentity(){try{S.identityStatus=await api('/api/identity/status');if(S.me){S.me.identityVerified=!!S.identityStatus.verified;await saveUser(S.me)}render()}catch(e){toast(e.message)}},
+async openIdentity(){try{S.identityStatus=await api('/api/identity/status');if(S.me){S.me.identityVerified=!!S.identityStatus.verified;const safe={...S.me};delete safe.apiToken;await saveUser(safe)}go('identity')}catch(e){toast(e.message)}},
+async refreshIdentity(){try{S.identityStatus=await api('/api/identity/status');if(S.me){S.me.identityVerified=!!S.identityStatus.verified;const safe={...S.me};delete safe.apiToken;await saveUser(safe)}render()}catch(e){toast(e.message)}},
 async startIdentity(){const consent=$('identityConsent')?.checked===true;if(!consent){toast('Aceita o consentimento antes de continuar.');return}try{const d=await api('/api/identity/start',{method:'POST',body:JSON.stringify({consent:true})});if(!d.url)throw new Error('A Didit não devolveu o link de verificação.');window.location.assign(d.url)}catch(e){toast(e.message)}},
 resumeIdentity(){const url=S.identityStatus?.sessionUrl;if(url){try{const u=new URL(url);if(u.protocol==='https:'&&(u.hostname==='verify.didit.me'||u.hostname.endsWith('.didit.me'))){window.location.assign(u.href);return}}catch{}}toast('Não foi possível retomar a verificação. Atualiza o estado.')},
 async openSecurity(){try{S.securityStatus=await api('/api/security/status');S.biometricInfo=null;S.biometricEnabled=false;if(isNativeApp()&&window.AquipayNativeSecurity){S.biometricInfo=await window.AquipayNativeSecurity.checkBiometry().catch(()=>null);S.biometricEnabled=(await window.AquipayNativeSecurity.secureGet('aquipay.biometric.'+S.me.id).catch(()=>null))==='true'}go('security')}catch(e){toast(e.message)}},
