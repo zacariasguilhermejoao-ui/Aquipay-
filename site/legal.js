@@ -132,7 +132,7 @@ function docHtml(id) {
   const fill = t => Object.entries(CONTACTS).reduce((value, [token, address]) => value.replaceAll(token, address), t).replace('{{VERSION}}', ver);
   const esc2 = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const body = d.sections.map(([t, parts]) =>
-    '<h3>' + esc2(t) + '</h3>' + parts.map(p => Array.isArray(p) ? '<ul>' + p.map(li => '<li>' + esc2(li) + '</li>').join('') + '</ul>' : '<p>' + esc2(fill(p)).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, email => '<a class="link" href="mailto:' + email + '">' + email + '</a>') + '</p>').join('')
+    '<h3>' + esc2(t) + '</h3>' + parts.map(p => Array.isArray(p) ? '<ul>' + p.map(li => '<li>' + esc2(li) + '</li>').join('') + '</ul>' : '<p>' + esc2(fill(p)).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, email => '<a class="link" href="mailto:' + email + '">' + email + '</a>') + '</p>').join('')
   ).join('');
   const upd = ['sobre', 'ajuda'].includes(id) ? '' : '<p class="upd">Atualizado em ' + LEGAL_UPDATED + '</p>';
   const cta = id === 'ajuda' ? '<div class="stack"><a class="btn" href="mailto:suporte@isabstudio.dev">Contactar suporte</a><a class="btn secondary" href="mailto:contas@isabstudio.dev">Pagamentos e reembolsos</a><a class="btn secondary" href="mailto:privacidade@isabstudio.dev">Privacidade</a><a class="btn secondary" href="mailto:denuncia@isabstudio.dev">Fazer denúncia</a><a class="btn secondary" href="mailto:parceria@isabstudio.dev">Parcerias</a></div>' : '';
