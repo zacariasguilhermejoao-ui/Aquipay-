@@ -11,7 +11,6 @@ let LANG = 'pt';
 
 const DICT = [
   /* ——— autenticação ——— */
-  ['Trabalhos e oportunidades perto de ti', 'Jobs and opportunities near you', 'Des emplois et des opportunités près de chez vous', '你身边的工作与机会'],
   ['Cria a tua conta', 'Create your account', 'Créez votre compte', '创建你的账户'],
   ['Nome', 'Name', 'Nom', '姓名'],
   ['Email', 'Email', 'E-mail', '电子邮箱'],
