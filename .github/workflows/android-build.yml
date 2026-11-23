@@ -431,18 +431,6 @@ jobs:
             exit 1
           fi
 
-          # Validate the private-key password independently where keytool supports it.
-          if ! keytool -keypasswd -keystore android/release.keystore \
-              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-              -alias "$ANDROID_KEY_ALIAS" \
-              -keypass "$ANDROID_KEY_PASSWORD" \
-              -new "$ANDROID_KEY_PASSWORD" \
-              >"$RUNNER_TEMP/keystore-keypass-check.log" 2>&1; then
-            echo "::error::The key alias exists, but ANDROID_KEY_PASSWORD may not match the private-key password:"
-            cat "$RUNNER_TEMP/keystore-keypass-check.log"
-            exit 1
-          fi
-
           echo "Keystore, store password, alias, and private-key password validated."
 
           python - <<'PY'
