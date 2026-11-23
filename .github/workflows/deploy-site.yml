@@ -1,6 +1,7 @@
 name: Deploy Aquipay site to Cloudflare
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -20,7 +21,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN não está configurado nos secrets do GitHub. O deploy foi ignorado."
-            exit 0
+            echo "::error::CLOUDFLARE_API_TOKEN não está configurado nos secrets do GitHub."
+            exit 1
           fi
           npx --yes wrangler@4 deploy --config wrangler.jsonc
