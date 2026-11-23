@@ -278,7 +278,7 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   let host='';try{const parsed=new URL(url);if(parsed.protocol==='https:')host=parsed.hostname}catch{}
   if(!sessionId||!host||(host!=='verify.didit.me'&&!host.endsWith('.didit.me')))return err('A Didit devolveu uma sessão inválida.',502);
   const now=new Date().toISOString();
-  await env.DB.prepare('INSERT INTO identity_verifications(id,user_id,session_id,status,session_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(uid(),me.id,sessionId,'In Progress',url,now,now).run();
+  await env.DB.prepare('INSERT INTO identity_verifications(id,user_id,session_id,status,session_url,created_at,updated_at,consent_at,consent_version) VALUES(?,?,?,?,?,?,?,?,?)').bind(uid(),me.id,sessionId,'In Progress',url,now,now,now,'2026-11-23-v1').run();
   return out({sessionId,url,status:'In Progress'},201);
  }
 
