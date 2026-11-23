@@ -1,6 +1,6 @@
 'use strict';
 const APP_VERSION='1.0.0';
-const CFG={payUrl:'',vapidKey:'BH-wW8rBNSru4t4iAiHetwaqYhLpaq59JitYbwYEpYzk9bc4W9vy25QxwFCn5bjlQ12PaO15ufvQS7ivcU_4D6g',googleClientId:'34883461021-8c95ocf3la4lmc087dqhu9l82jji3qpd.apps.googleusercontent.com',supportEmail:'zacariasguilhermejoao@gmail.com',apiBase:'https://aquipay-api.osamariches.workers.dev'};
+const CFG={payUrl:'',vapidKey:'BH-wW8rBNSru4t4iAiHetwaqYhLpaq59JitYbwYEpYzk9bc4W9vy25QxwFCn5bjlQ12PaO15ufvQS7ivcU_4D6g',googleClientId:'34883461021-8c95ocf3la4lmc087dqhu9l82jji3qpd.apps.googleusercontent.com',supportEmail:'suporte@isabstudio.dev',apiBase:'https://aquipay-api.osamariches.workers.dev'};
 const TIPO={biscato:'Trabalho rápido',freelancer:'Freelancer',emprego:'Emprego'};
 const PKG=[[10,.99],[50,4.99],[110,9.99,10],[240,19.99,40],[650,49.99,150]];
 const IC={ /* Lucide (lucide.dev, licença ISC): conjunto único, traço 2, extremidades redondas */
