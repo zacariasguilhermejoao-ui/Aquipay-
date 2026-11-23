@@ -213,12 +213,11 @@ jobs:
           fi
           chmod 600 android/release.keystore
 
-          # keytool -list validates the store password and alias. keytool's list
-          # operation does not accept -keypass; Gradle validates the private-key password at signing.
+          # keytool -list validates the keystore, store password, and alias.
+          # The list command does not support -keypass; Gradle checks the key password when signing.
           if ! keytool -list -v -keystore android/release.keystore \
               -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-              -alias "$ANDROID_KEY_ALIAS" \
-              -keypass "$ANDROID_KEY_PASSWORD" >/dev/null 2>&1; then
+              -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
             echo "::error::Keystore validation failed. Check the Base64, keystore password, and alias secrets."
             exit 1
           fi
