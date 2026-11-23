@@ -186,27 +186,59 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Configure signed release keystore
+      - name: Configure and validate release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
         run: |
+          set +x
+          set -euo pipefail
+
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required signing secret is missing: $name"
+              exit 1
+            fi
+          done
+
+          mkdir -p android
+          # Remove only accidental CR/LF wrapping from Base64. Passwords are never trimmed or rewritten.
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n' | base64 --decode > android/release.keystore
+          if [[ ! -s android/release.keystore ]]; then
+            echo "::error::Decoded keystore is empty."
+            exit 1
+          fi
+          chmod 600 android/release.keystore
+
+          # keytool -list validates the store password and alias. keytool's list
+          # operation does not accept -keypass; Gradle validates the private-key password at signing.
+          if ! keytool -list -v -keystore android/release.keystore \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Keystore validation failed. Check the Base64, keystore password, and alias secrets."
+            exit 1
+          fi
+          echo "Keystore file, store password, and alias validated."
+
           python - <<'PY'
-          import os, base64
           from pathlib import Path
 
-          encoded = os.environ.get("ANDROID_KEYSTORE_BASE64")
-          if not encoded:
-              raise SystemExit("Missing GitHub Actions secret: ANDROID_KEYSTORE_BASE64")
-          keystore = Path("android/release.keystore")
-          keystore.write_bytes(base64.b64decode(encoded, validate=True))
-
           gradle = Path("android/app/build.gradle")
-          source = gradle.read_text(encoding="utf-8")
+          if not gradle.is_file():
+              raise SystemExit("::error::android/app/build.gradle was not generated.")
 
-          # Replace every accidental literal backslash-n marker with a real newline.
+          source = gradle.read_text(encoding="utf-8")
+          # Repair accidental literal backslash-n sequences from generated content.
           source = source.replace("\\n", "\n")
 
-          signing = """
+          marker = "// AquiPay CI release signing"
+          if marker not in source:
+              source = source.rstrip() + """
+
+          // AquiPay CI release signing
           android {
               signingConfigs {
                   release {
@@ -223,18 +255,10 @@ jobs:
               }
           }
           """
-
-          # Rewrite the entire generated Gradle file as UTF-8 Groovy source.
-          if "signingConfigs" not in source:
-              source = source.rstrip() + "\n\n" + signing.strip() + "\n"
-          else:
-              source = source.rstrip() + "\n"
-
           if "\\n" in source:
-              raise SystemExit("Literal backslash-n remains in android/app/build.gradle")
-
-          gradle.write_text(source, encoding="utf-8", newline="\n")
-          print("android/app/build.gradle rewritten; signing secrets remain environment-only.")
+              raise SystemExit("::error::Literal backslash-n remains in android/app/build.gradle")
+          gradle.write_text(source.rstrip() + "\n", encoding="utf-8", newline="\n")
+          print("Gradle release signing configuration prepared.")
           PY
 
       - name: Build APK (debug)
