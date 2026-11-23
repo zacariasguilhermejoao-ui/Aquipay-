@@ -176,7 +176,7 @@ jobs:
                   payload.put("files", files);
                   if (payload.optString("text").isEmpty() && payload.optString("title").isEmpty() && files.length() == 0) return;
                   pendingShare = payload;
-                  notifyListeners("shareReceived", payload, true);
+                  notifyListeners("shareReceived", payload);
               }
 
               private Uri getSingleStream(Intent intent) {
