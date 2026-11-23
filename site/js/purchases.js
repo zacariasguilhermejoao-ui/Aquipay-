@@ -93,8 +93,21 @@ export async function buyPlus(api) {
   return { success: true, plusActive: verified.plusActive === true, expiresAt: verified.expiresAt };
 }
 
-export async function restorePurchases() {
+export async function syncPlusSubscription(api) {
+  if (!nativeAndroid() || !PLAY_PRODUCTS.plus.id || !api) return { synced: false };
+  const { purchases } = await NativePurchases.getPurchases({ productType: PURCHASE_TYPE.SUBS });
+  const found = (purchases || []).find(p =>
+    p?.purchaseToken &&
+    [p.productIdentifier, p.productId, p.planIdentifier].includes(PLAY_PRODUCTS.plus.id)
+  );
+  if (!found) return { synced: false };
+  await sendForVerification(api, 'plus', PLAY_PRODUCTS.plus.id, found);
+  return { synced: true };
+}
+
+export async function restorePurchases(api) {
   if (!nativeAndroid()) return { success: false, reason: 'android_only' };
   await NativePurchases.restorePurchases();
-  return { success: true, message: 'Compras recuperadas. O estado e os direitos devem ser sincronizados com o servidor.' };
+  const synced = api ? await syncPlusSubscription(api) : { synced: false };
+  return { success: true, synced: synced.synced };
 }
