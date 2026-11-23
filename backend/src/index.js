@@ -60,7 +60,9 @@ async function googleAuth(req,env){
     u={id,name,email,status:'active'};created=true;
   }
   if(u.status!=='active')return err('Conta indisponível.',403);
-  const security=await env.DB.prepare('SELECT totp_enabled FROM users WHERE id=?').bind(u.id).first();\n  if(security?.totp_enabled)return issueLoginChallenge(u.id,env);\n  return out({user:{id:u.id,name:u.name,email:u.email,deletionRequestedAt:u.deletion_requested_at||null,deletionDueAt:u.deletion_due_at||null},...await session(u.id,env)},created?201:200);
+  const security=await env.DB.prepare('SELECT totp_enabled FROM users WHERE id=?').bind(u.id).first();
+  if(security?.totp_enabled)return issueLoginChallenge(u.id,env);
+  return out({user:{id:u.id,name:u.name,email:u.email,deletionRequestedAt:u.deletion_requested_at||null,deletionDueAt:u.deletion_due_at||null},...await session(u.id,env)},created?201:200);
 }
 const PUSH_HOSTS=['googleapis.com','mozilla.com','push.apple.com','windows.com','samsung.com'];
 const PUSH_PREF={proposal:'candidaturas',proposal_status:'candidaturas',rating:'candidaturas',message:'mensagens',post:'novidades'};
