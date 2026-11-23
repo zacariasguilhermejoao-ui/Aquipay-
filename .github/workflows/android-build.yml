@@ -189,28 +189,26 @@ jobs:
       - name: Configure signed release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           python - <<'PY'
           import os, base64
           from pathlib import Path
 
-          names = ["ANDROID_KEYSTORE_BASE64", "ANDROID_KEYSTORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD"]
-          missing = [name for name in names if not os.environ.get(name)]
-          if missing:
-              raise SystemExit("Missing GitHub Actions secrets: " + ", ".join(missing))
+          encoded = os.environ.get("ANDROID_KEYSTORE_BASE64")
+          if not encoded:
+              raise SystemExit("Missing GitHub Actions secret: ANDROID_KEYSTORE_BASE64")
+          keystore = Path("android/release.keystore")
+          keystore.write_bytes(base64.b64decode(encoded, validate=True))
 
-          app_dir = Path("android/app")
-          (app_dir / "upload-key.jks").write_bytes(base64.b64decode(os.environ["ANDROID_KEYSTORE_BASE64"], validate=True))
-          gradle = app_dir / "build.gradle"
+          gradle = Path("android/app/build.gradle")
           source = gradle.read_text()
+          if "\\\\n" in source:
+              raise SystemExit("Literal backslash-n marker found in android/app/build.gradle")
           signing = """
           android {
               signingConfigs {
                   release {
-                      storeFile file("upload-key.jks")
+                      storeFile file("../release.keystore")
                       storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
                       keyAlias System.getenv("ANDROID_KEY_ALIAS")
                       keyPassword System.getenv("ANDROID_KEY_PASSWORD")
@@ -224,17 +222,24 @@ jobs:
           }
           """
           if "signingConfigs" not in source:
-              gradle.write_text(source + "\n" + signing)
-          print("Release signing configured; private key remains in runner workspace.")
+              gradle.write_text(source + "\\n" + signing)
+          print("Release signing configuration prepared without exposing secrets.")
           PY
 
       - name: Build APK (debug)
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Build AAB + APK (release)
+      - name: Build APK + AAB (release)
         working-directory: android
-        run: ./gradlew bundleRelease assembleRelease --stacktrace
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease bundleRelease --stacktrace
+          jarsigner -verify app/build/outputs/apk/release/*.apk
+          jarsigner -verify app/build/outputs/bundle/release/*.aab
 
       - name: Upload APK (debug)
         uses: actions/upload-artifact@v4
