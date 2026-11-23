@@ -61,7 +61,7 @@ export async function handleGooglePlayBilling(req,env,me){
  if(!plusProduct||!basePlan||productId!==plusProduct)return response({error:"Produto Plus ainda não configurado."},503);
  let sub;try{sub=await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken))}catch{return response({error:"Não foi possível validar a assinatura na Google Play."},503)}
  const line=(sub.lineItems||[]).find(x=>x.productId===plusProduct&&x.offerDetails?.basePlanId===basePlan);
- const active=["SUBSCRIPTION_STATE_ACTIVE","SUBSCRIPTION_STATE_IN_GRACE_PERIOD"].includes(sub.subscriptionState),expiresAt=line?.expiryTime;
+ const active=["SUBSCRIPTION_STATE_ACTIVE","SUBSCRIPTION_STATE_IN_GRACE_PERIOD","SUBSCRIPTION_STATE_CANCELED"].includes(sub.subscriptionState),expiresAt=line?.expiryTime;
  if(!line||!active||!expiresAt||Date.parse(expiresAt)<=Date.now())return response({error:"A assinatura Plus não está ativa ou não corresponde ao plano mensal."},409);
  const existing=await env.DB.prepare("SELECT user_id,product_id FROM google_play_purchases WHERE purchase_token_hash=?").bind(tokenHash).first();
  if(existing&&(existing.user_id!==me.id||existing.product_id!==plusProduct))return response({error:"Esta assinatura já está associada a outra conta."},409);
