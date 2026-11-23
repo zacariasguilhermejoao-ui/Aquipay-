@@ -346,6 +346,13 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
+      - name: Use direct Gradle distribution mirror
+        run: |
+          if [ -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            sed -i 's#services.gradle.org/distributions/#downloads.gradle.org/distributions/#; s/-all.zip/-bin.zip/' android/gradle/wrapper/gradle-wrapper.properties
+            grep '^distributionUrl=' android/gradle/wrapper/gradle-wrapper.properties
+          fi
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
