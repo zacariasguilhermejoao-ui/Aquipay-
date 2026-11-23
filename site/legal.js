@@ -102,7 +102,7 @@ const DOCS = {
 
   sobre: {
     icon: 'info', title: 'Sobre o Aquipay',
-    intro: 'Trabalhos e oportunidades perto de ti.',
+    intro: 'Aproximamos pessoas, serviços e oportunidades em Angola.',
     sections: [
       ['A nossa missão', ['Tornar mais simples e mais seguro encontrar trabalho e contratar serviços em Angola, com perfis transparentes e um histórico de pagamentos que se vê antes de aceitar.']],
       ['O que podes fazer', [['Publicar trabalhos, serviços e empregos com fotografias.', 'Candidatar-te vendo antes quem está do outro lado.', 'Construir um perfil com experiência, formação e portefólio.', 'Receber classificações depois de cada trabalho concluído.']]],
