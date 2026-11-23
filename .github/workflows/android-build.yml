@@ -349,6 +349,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Build APK (debug)
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
       - name: Configure and validate release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -427,10 +431,6 @@ jobs:
           gradle.write_text(source.rstrip() + "\n", encoding="utf-8", newline="\n")
           print("Gradle release signing configuration prepared.")
           PY
-
-      - name: Build APK (debug)
-        working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
 
       - name: Build APK + AAB (release)
         working-directory: android
