@@ -186,6 +186,48 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Configure signed release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          python - <<'PY'
+          import os, base64
+          from pathlib import Path
+
+          names = ["ANDROID_KEYSTORE_BASE64", "ANDROID_KEYSTORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD"]
+          missing = [name for name in names if not os.environ.get(name)]
+          if missing:
+              raise SystemExit("Missing GitHub Actions secrets: " + ", ".join(missing))
+
+          app_dir = Path("android/app")
+          (app_dir / "upload-key.jks").write_bytes(base64.b64decode(os.environ["ANDROID_KEYSTORE_BASE64"], validate=True))
+          gradle = app_dir / "build.gradle"
+          source = gradle.read_text()
+          signing = """
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("upload-key.jks")
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          """
+          if "signingConfigs" not in source:
+              gradle.write_text(source + "\\n" + signing)
+          print("Release signing configured; private key remains in runner workspace.")
+          PY
+
       - name: Build APK (debug)
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
