@@ -29,6 +29,7 @@ jobs:
       - name: Bundle Capacitor native plugins
         run: |
           npx --yes esbuild@0.25.0 site/native-push-entry.js --bundle --platform=browser --format=iife --outfile=site/native-push.bundle.js
+          npx --yes esbuild@0.25.0 site/native-contacts-entry.js --bundle --platform=browser --format=iife --outfile=site/native-contacts.bundle.js
           npx --yes esbuild@0.25.0 site/native-google-entry.js --bundle --platform=browser --format=iife --outfile=site/native-google.bundle.js
 
       - name: Validate JavaScript syntax
