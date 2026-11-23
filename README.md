@@ -41,3 +41,13 @@ Para o login nativo funcionar, regista os SHA-1/SHA-256 da APK no Firebase e vol
 - A página inicial inclui metadados básicos para motores de busca e pré-visualizações em redes sociais.
 - O sitemap está em `site/sitemap.xml` e as regras de indexação em `site/robots.txt`.
 - O Worker do site usa `not_found_handling: single-page-application` para permitir abrir diretamente as rotas internas da aplicação.
+
+
+## Idiomas e segurança da conta
+- A interface suporta português, inglês, francês e chinês; as traduções ficam em `site/i18n.js`.
+- As páginas de termos, privacidade e ajuda ficam em `site/legal.js`.
+- Inclui recuperação de palavra-passe, alteração de palavra-passe, eliminação de conta, exportação dos dados, denúncias e bloqueio/desbloqueio de utilizadores.
+- A API filtra perfis bloqueados nas pesquisas e impede propostas entre utilizadores que se bloquearam.
+- O esquema de segurança está em `backend/migrations/0006_account_safety.sql`. As tabelas `reports`, `blocks` e `password_resets` foram confirmadas na D1 de produção.
+- A recuperação por email usa o binding Cloudflare `EMAIL` e o remetente `MAIL_FROM`. Para enviar mensagens reais, é necessário ativar Email Sending para `isabstudio.dev` na Cloudflare.
+- O Service Worker usa a cache `aquipay-v13` para carregar os novos ficheiros de idioma e páginas legais.
