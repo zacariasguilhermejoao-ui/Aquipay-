@@ -242,11 +242,11 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   if(diff!==0)return err('Assinatura do webhook inválida.',401);
   const sessionId=clean(payload.session_id||payload.sessionId||payload.session?.id,120);
   const status=clean(payload.status||payload.decision?.status,40);
-  const event=clean(payload.webhook_type||payload.event||payload.type,'80');
-  if(!sessionId||!status)return err('Evento Didit incompleto.',400);
+  const event=clean(payload.webhook_type||payload.event||payload.type,80);
+  if(!sessionId||!['Not Started','In Progress','Awaiting User','In Review','Approved','Declined','Resubmitted','Abandoned','Expired','Kyc Expired','Not Finished'].includes(status))return err('Evento Didit incompleto ou com estado inválido.',400);
   const row=await env.DB.prepare('SELECT user_id FROM identity_verifications WHERE session_id=?').bind(sessionId).first();
   if(!row)return out({ok:true,ignored:true});
-  const eventKey=await digest(sessionId+':'+event+':'+status+':'+String(payload.timestamp||ts));
+  const eventKey=await digest(sessionId+':'+event+':'+status);
   const inserted=await env.DB.prepare('INSERT OR IGNORE INTO identity_webhook_events(event_key,session_id,event_type) VALUES(?,?,?)').bind(eventKey,sessionId,event||'status').run();
   if(!inserted.meta?.changes)return out({ok:true,duplicate:true});
   const now=new Date().toISOString();
