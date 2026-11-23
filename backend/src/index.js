@@ -11,7 +11,7 @@ const clean=(s,n)=>typeof s==='string'?s.trim().slice(0,n):'';
 const emailOk=s=>/^\S+@\S+\.\S+$/.test(s)&&s.length<=254;
 async function session(userId,env){const token=b64(crypto.getRandomValues(new Uint8Array(32))),expires=new Date(Date.now()+30*86400000).toISOString();await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),userId,expires).run();return{token,expiresAt:expires}}
 async function current(req,env){const h=req.headers.get('authorization')||'',t=h.startsWith('Bearer ')?h.slice(7):'';if(!t)return null;return env.DB.prepare("SELECT u.id,u.name,u.email,u.deletion_requested_at,u.deletion_due_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.status='active'").bind(await digest(t),new Date().toISOString()).first()}
-async function notice(env,userId,kind,title,body,data={}){await env.DB.prepare('INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)').bind(uid(),userId,kind,title.slice(0,100),body.slice(0,500),JSON.stringify(data)).run();await pushTo(env,userId,kind,title,body)}
+async function notice(env,userId,kind,title,body,data={}){const active=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(userId).first();if(!active)return;await env.DB.prepare('INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)').bind(uid(),userId,kind,title.slice(0,100),body.slice(0,500),JSON.stringify(data)).run();await pushTo(env,userId,kind,title,body)}
 async function limited(req,env,name,max,sec){
   const ip=req.headers.get('cf-connecting-ip')||'unknown',now=Date.now(),k=name+':'+ip+':'+Math.floor(now/(sec*1000));
   const r=await env.DB.prepare('INSERT INTO rate_limits(k,n,exp) VALUES(?,1,?) ON CONFLICT(k) DO UPDATE SET n=n+1 RETURNING n').bind(k,now+sec*2000).first();
@@ -191,7 +191,7 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   if(!x||x.status!=='active')return err('Não foi encontrada uma conta ativa para esses dados.',404);
   if(x.deletion_requested_at)return out({ok:true,alreadyRequested:true,deletionRequestedAt:x.deletion_requested_at,deletionDueAt:x.deletion_due_at});
   const now=new Date(),due=new Date(now.getTime()+30*86400000).toISOString(),requested=now.toISOString();
-  await env.DB.prepare('UPDATE users SET deletion_requested_at=?,deletion_due_at=? WHERE id=? AND status=\'active\'').bind(requested,due,x.id).run();
+  await env.DB.batch([env.DB.prepare('UPDATE users SET deletion_requested_at=?,deletion_due_at=? WHERE id=? AND status=\'active\'').bind(requested,due,x.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(x.id)]);
   return out({ok:true,deletionRequestedAt:requested,deletionDueAt:due});
  }
  // Pesquisa e perfil público: apenas dados profissionais publicados pelo próprio titular.
