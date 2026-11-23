@@ -346,6 +346,27 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
+      - name: Configure encrypted storage backup exclusions
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/backup_rules.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <full-backup-content>
+              <exclude domain="sharedpref" path="cap_sec.xml" />
+          </full-backup-content>
+          XML
+          cat > android/app/src/main/res/xml/data_extraction_rules.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <data-extraction-rules>
+              <cloud-backup>
+                  <exclude domain="sharedpref" path="cap_sec.xml" />
+              </cloud-backup>
+              <device-transfer>
+                  <exclude domain="sharedpref" path="cap_sec.xml" />
+              </device-transfer>
+          </data-extraction-rules>
+          XML
+
       - name: Use direct Gradle distribution mirror
         run: |
           if [ -f android/gradle/wrapper/gradle-wrapper.properties ]; then
