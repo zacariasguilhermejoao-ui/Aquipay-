@@ -6,9 +6,9 @@ const LEGAL_UPDATED = '23 de novembro de 2026';
 const DOCS = {
   termos: {
     icon: 'scroll', title: 'Termos de Uso',
-    intro: 'Estes termos regulam o uso do Aquipay. Ao criar uma conta ou usar a aplicação, aceitas estas condições.',
+    intro: 'Estes termos regulam o uso do AquiPay, uma plataforma digital pertencente e operada pela ISAB GROUP. Ao criar uma conta ou usar a aplicação, aceitas estas condições.',
     sections: [
-      ['1. O que é o Aquipay', ['O Aquipay é uma plataforma que aproxima quem oferece trabalhos, serviços e empregos de quem procura oportunidades. O Aquipay não é empregador, agência de recrutamento nem parte nos acordos feitos entre utilizadores.']],
+      ['1. O que é o AquiPay', ['O AquiPay é uma plataforma digital pertencente à ISAB GROUP, empresa responsável pela sua gestão e operação. A plataforma aproxima quem oferece trabalhos, serviços e empregos de quem procura oportunidades. O AquiPay não é empregador, agência de recrutamento nem parte nos acordos feitos entre utilizadores.']],
       ['2. Conta e elegibilidade', [['Tens de ter pelo menos 18 anos para criar uma conta.', 'As informações que forneces devem ser verdadeiras e atualizadas.', 'És responsável pela segurança da tua palavra-passe e por tudo o que acontece na tua conta.', 'Cada pessoa pode ter uma única conta.']]],
       ['3. Anúncios e candidaturas', ['Quem publica um anúncio deve descrever o trabalho com clareza: tarefa, local, valor e condições. Quem se candidata deve fazê-lo de boa-fé e cumprir o que combinar.', 'O Aquipay pode remover anúncios que sejam enganosos, ilegais ou que violem as Regras da Comunidade.']],
       ['4. Pagamentos entre utilizadores', ['O pagamento de um trabalho é combinado e feito diretamente entre as partes, fora do Aquipay. A aplicação regista apenas a confirmação de quem recebeu ou não o pagamento, para construir o histórico de cada perfil.', 'O Aquipay não garante o pagamento nem a qualidade de qualquer trabalho.']],
@@ -19,13 +19,14 @@ const DOCS = {
       ['9. Suspensão e encerramento', ['Podemos limitar, suspender ou encerrar contas que violem estes termos. Podes encerrar a tua conta a qualquer momento, através do pedido de eliminação nas Definições.']],
       ['10. Responsabilidade', ['Fazemos o possível para manter o serviço estável e seguro, mas ele é prestado tal como está disponível. Na medida permitida pela lei, o Aquipay não responde por prejuízos resultantes de acordos feitos entre utilizadores, nem por indisponibilidades fora do nosso controlo.']],
       ['11. Alterações', ['Podemos atualizar estes termos. Quando a alteração for relevante, avisamos na aplicação antes de entrar em vigor. Continuar a usar o Aquipay depois disso significa que aceitas a nova versão.']],
-      ['12. Lei aplicável', ['Estes termos regem-se pela lei da República de Angola. Os litígios serão resolvidos nos tribunais competentes de Luanda, sem prejuízo dos direitos que a lei reconhece aos consumidores.']],\n      ['13. Contacto', ['Para apoio geral, problemas técnicos ou questões sobre estes termos, escreve para {{SUPPORT_EMAIL}}. Para propostas comerciais e parcerias, utiliza {{PARTNERSHIP_EMAIL}}.']]
+      ['12. Lei aplicável', ['Estes termos regem-se pela lei da República de Angola. Os litígios serão resolvidos nos tribunais competentes de Luanda, sem prejuízo dos direitos que a lei reconhece aos consumidores.']],
+      ['13. Contacto', ['Para apoio geral, problemas técnicos ou questões sobre estes termos, escreve para {{SUPPORT_EMAIL}}. Para propostas comerciais e parcerias, utiliza {{PARTNERSHIP_EMAIL}}.']]
     ]
   },
 
   privacidade: {
     icon: 'lock', title: 'Política de Privacidade',
-    intro: 'Explicamos que dados recolhemos, para que os usamos e que direitos tens. Tratamos os dados pessoais de acordo com a Lei n.º 22/11, de 17 de Junho, da Protecção de Dados Pessoais de Angola.',
+    intro: 'Esta política explica que dados recolhemos, para que os usamos e que direitos tens. A ISAB GROUP, responsável pela operação do AquiPay, trata os dados pessoais de acordo com a Lei n.º 22/11, de 17 de Junho, da Protecção de Dados Pessoais de Angola.',
     sections: [
       ['1. Dados que recolhemos', [['Conta: nome, email e palavra-passe (guardada de forma cifrada). Se entrares com Google, recebemos o teu nome e email da tua conta Google.', 'Perfil: cidade, telefone, biografia, profissões, competências, experiência, formação e portefólio, conforme preencheres.', 'Documentos e fotografias que enviares, como CV, certificados e imagens dos anúncios.', 'Atividade: anúncios, candidaturas, classificações e confirmações de pagamento.', 'Dados técnicos básicos necessários ao funcionamento e à segurança do serviço.']]],
       ['2. Para que usamos os dados', [['Criar e gerir a tua conta e o teu perfil.', 'Mostrar anúncios e perfis a quem os procura.', 'Calcular o histórico de pagamentos e as classificações de cada perfil.', 'Enviar avisos sobre candidaturas, pagamentos e segurança da conta.', 'Prevenir fraude e abusos, e cumprir obrigações legais.']]],
@@ -41,7 +42,7 @@ const DOCS = {
 
   reembolso: {
     icon: 'receipt', title: 'Pagamentos e Reembolsos',
-    intro: 'Como funcionam as moedas e o plano Plus, e em que casos devolvemos o dinheiro.',
+    intro: 'Esta política explica como funcionam as moedas e o plano Plus, e em que casos são processados reembolsos. O AquiPay é uma plataforma da ISAB GROUP.',
     sections: [
       ['1. Moedas', [['As moedas são compradas em pacotes e usadas dentro do Aquipay, por exemplo em candidaturas adicionais.', 'Não têm valor em dinheiro e não podem ser transferidas, vendidas ou levantadas.', 'As moedas de boas-vindas e de bónus não são reembolsáveis.']]],
       ['2. Reembolso de moedas', [['Moedas compradas e ainda não usadas podem ser devolvidas se o pedido for feito até 7 dias após a compra.', 'Moedas já gastas não são reembolsadas.', 'Se um anúncio a que te candidataste for removido por violar as regras, devolvemos as moedas gastas nessa candidatura.']]],
@@ -83,7 +84,8 @@ const DOCS = {
       ['O que guardamos no dispositivo', [['A tua sessão, para não teres de iniciar sessão sempre que abres a aplicação.', 'As tuas definições, como tema, tamanho e tipo de letra.', 'Cópias de dados e ficheiros da aplicação, para que ela abra mais depressa e funcione com pouca ligação.']]],
       ['Cookies de publicidade', ['Não usamos cookies de publicidade nem de seguimento entre sites.']],
       ['Google', ['Se escolheres entrar com Google, a Google pode usar cookies próprios durante o início de sessão, segundo a política dela.']],
-      ['Como limpar', ['Em Definições, Limpar dados deste dispositivo, apagas tudo o que a aplicação guardou localmente. Terás de iniciar sessão novamente.']],\n      ['Dúvidas sobre privacidade', ['Para questões sobre dados pessoais, escreve para {{PRIVACY_EMAIL}}.']]
+      ['Como limpar', ['Em Definições, Limpar dados deste dispositivo, apagas tudo o que a aplicação guardou localmente. Terás de iniciar sessão novamente.']],
+      ['Dúvidas sobre privacidade', ['Para questões sobre dados pessoais, escreve para {{PRIVACY_EMAIL}}.']]
     ]
   },
 
@@ -96,17 +98,22 @@ const DOCS = {
       ['O que significa o selo de verificado?', ['A conta passou pelo processo de verificação do Aquipay. Para pedir, vai a Perfil e toca em Pedir verificação.']],
       ['Como funciona o histórico de pagamentos?', ['Quando um trabalho é concluído, quem trabalhou confirma se recebeu ou não o pagamento. Essas confirmações formam o histórico visível no perfil de quem paga.']],
       ['Como altero ou apago a minha conta?', ['Altera os dados em Perfil. Para apagar, vai a Definições e usa Pedir eliminação da conta.']],
-      ['Apoio ao utilizador', ['Dúvidas gerais, problemas técnicos ou dificuldades com a conta: {{SUPPORT_EMAIL}}.']],\n      ['Pagamentos e contas', ['Compras, moedas, plano Plus, cobranças e reembolsos: {{ACCOUNTS_EMAIL}}.']],\n      ['Privacidade e dados pessoais', ['Pedidos sobre os teus dados pessoais: {{PRIVACY_EMAIL}}.']],\n      ['Denúncias e segurança', ['Fraude, abuso, assédio ou conteúdos indevidos: {{REPORT_EMAIL}}.']],\n      ['Parcerias', ['Propostas comerciais e parcerias: {{PARTNERSHIP_EMAIL}}.']]
+      ['Apoio ao utilizador', ['Dúvidas gerais, problemas técnicos ou dificuldades com a conta: {{SUPPORT_EMAIL}}.']],
+      ['Pagamentos e contas', ['Compras, moedas, plano Plus, cobranças e reembolsos: {{ACCOUNTS_EMAIL}}.']],
+      ['Privacidade e dados pessoais', ['Pedidos sobre os teus dados pessoais: {{PRIVACY_EMAIL}}.']],
+      ['Denúncias e segurança', ['Fraude, abuso, assédio ou conteúdos indevidos: {{REPORT_EMAIL}}.']],
+      ['Parcerias', ['Propostas comerciais e parcerias: {{PARTNERSHIP_EMAIL}}.']]
     ]
   },
 
   sobre: {
     icon: 'info', title: 'Sobre o Aquipay',
-    intro: 'Aproximamos pessoas, serviços e oportunidades em Angola.',
+    intro: 'Aproximamos pessoas, serviços e oportunidades em Angola. O AquiPay é uma plataforma da ISAB GROUP.',
     sections: [
       ['A nossa missão', ['Tornar mais simples e mais seguro encontrar trabalho e contratar serviços em Angola, com perfis transparentes e um histórico de pagamentos que se vê antes de aceitar.']],
       ['O que podes fazer', [['Publicar trabalhos, serviços e empregos com fotografias.', 'Candidatar-te vendo antes quem está do outro lado.', 'Construir um perfil com experiência, formação e portefólio.', 'Receber classificações depois de cada trabalho concluído.']]],
-      ['Parcerias e contacto', ['Para propostas comerciais e parcerias, escreve para {{PARTNERSHIP_EMAIL}}. Para apoio geral, contacta {{SUPPORT_EMAIL}}.']],\n      ['Versão', ['Aquipay {{VERSION}}']]
+      ['Parcerias e contacto', ['Para propostas comerciais e parcerias, escreve para {{PARTNERSHIP_EMAIL}}. Para apoio geral, contacta {{SUPPORT_EMAIL}}.']],
+      ['Versão', ['Aquipay {{VERSION}}']]
     ]
   }
 };
