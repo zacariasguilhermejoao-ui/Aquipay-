@@ -46,7 +46,7 @@ const nid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const kz=n=>Number(n).toLocaleString('pt-AO')+' Kz';
 const ago=t=>{const s=(Date.now()-t)/1e3;return s<60?T('agora'):s<3600?T('{n} min',{n:Math.floor(s/60)}):s<86400?T('{n} h',{n:Math.floor(s/3600)}):T('{n} d',{n:Math.floor(s/86400)})};
 const norm=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().trim();
-const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda'}).format(new Date());
+const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const hasPlus=u=>S.usage?.plusActive===true;
 
 /* dados: IndexedDB */
@@ -147,7 +147,7 @@ const go=v=>{S.v=v;render()};
 function thumbs(){const t=$('th');if(t)t.innerHTML=S.pics.map((b,i)=>`<div><img src="${src(b)}" alt="Pré-visualização"><button class="btn ic" data-a="rmpic" data-id="${i}" aria-label="Remover">${ic('x')}</button></div>`).join('')}
 function pick(multi,cb){const i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=multi;i.onchange=async()=>{try{cb(await Promise.all([...i.files].map(f=>shrink(f))))}catch{toast('Não foi possível ler a imagem')}};i.click()}
 const cost=()=>0;
-const localApplicationsToday=()=>S.cands.filter(c=>c.userId===S.me?.id&&day()===new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda'}).format(new Date(c.at||Date.now()))).length;
+const localApplicationsToday=()=>S.cands.filter(c=>c.userId===S.me?.id&&day()===new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(c.at||Date.now()))).length;
 const localPostsThisMonth=()=>S.vagas.filter(v=>v.ownerId===S.me?.id&&(()=>{const d=new Date(v.at||Date.now());return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda',year:'numeric',month:'2-digit'}).format(d)===new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda',year:'numeric',month:'2-digit'}).format(new Date())})()).length;
 
 /* links públicos de partilha: snapshot textual autónomo */
