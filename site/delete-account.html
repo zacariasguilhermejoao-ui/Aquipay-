@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09090b">
+<title>Eliminar conta · Aquipay</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#09090b;color:#f4f4f5}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}
+main{width:min(100%,460px);background:#18181b;border:1px solid #303036;border-radius:22px;padding:26px}
+h1{font-size:25px;margin:0 0 10px}p{color:#c4c4cc;line-height:1.55;font-size:14px}
+label{display:block;font-size:13px;margin:15px 0 7px}input{width:100%;padding:14px;border-radius:12px;border:1px solid #45454d;background:#09090b;color:#fff;font-size:16px}
+button{width:100%;padding:14px;border:0;border-radius:12px;background:#7c3aed;color:white;font-weight:700;font-size:15px;margin-top:15px;cursor:pointer}
+button.secondary{background:#303036}button:disabled{opacity:.6}#status{margin-top:16px;padding:12px;border-radius:12px;display:none;white-space:pre-wrap}#status.ok{display:block;background:#123524;color:#b7f7ce}#status.err{display:block;background:#451a1a;color:#fecaca}
+a{color:#c4b5fd}small{color:#a1a1aa;display:block;margin-top:14px}
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<main>
+<h1>Pedido de eliminação da conta</h1>
+<p>Esta página permite solicitar a eliminação da tua conta Aquipay sem precisares de abrir a aplicação.</p>
+<p>Depois da confirmação, a conta fica desativada e deixa de aparecer no Aquipay. Os dados são eliminados permanentemente após <b>30 dias</b>. Podes cancelar o pedido durante esse prazo ao iniciar sessão na aplicação Aquipay.</p>
+<form id="requestForm">
+<label for="email">Email da conta</label>
+<input id="email" type="email" autocomplete="username" required placeholder="teu@email.com">
+<label for="password">Palavra-passe</label>
+<input id="password" type="password" autocomplete="current-password" required placeholder="Palavra-passe da conta">
+<button id="submit" type="submit">Confirmar pedido de eliminação</button>
+</form>
+<div id="googleButton" style="margin-top:12px"></div>
+<div id="status" role="status" aria-live="polite"></div>
+<small>Se a tua conta foi criada com Google, utiliza o botão Google. <a href="/">Voltar ao Aquipay</a> · <a href="/privacidade">Política de Privacidade</a></small>
+</main>
+<script>
+(function(){
+ const API='https://aquipay-api.osamariches.workers.dev';
+ const CLIENT='34883461021-8c95ocf3la4lmc087dqhu9l82jji3qpd.apps.googleusercontent.com';
+ const status=document.getElementById('status'),form=document.getElementById('requestForm'),button=document.getElementById('submit');
+ function message(text,ok){status.textContent=text;status.className=ok?'ok':'err'}
+ async function send(body){button.disabled=true;try{const r=await fetch(API+'/api/account-deletion/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Não foi possível registar o pedido.');const date=d.deletionDueAt?new Date(d.deletionDueAt).toLocaleDateString('pt-AO'):'dentro de 30 dias';form.style.display='none';document.getElementById('googleButton').style.display='none';message((d.alreadyRequested?'Já existia um pedido.':'Pedido registado com sucesso.')+' A tua conta será eliminada permanentemente em '+date+'. Para cancelar, inicia sessão no Aquipay antes dessa data.',true)}catch(e){message(e.message||'Erro de ligação. Tenta novamente.',false)}finally{button.disabled=false}}
+ form.addEventListener('submit',e=>{e.preventDefault();send({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value})});
+ function initGoogle(){if(!window.google||!google.accounts||!google.accounts.id)return;google.accounts.id.initialize({client_id:CLIENT,callback:resp=>send({credential:resp.credential})});google.accounts.id.renderButton(document.getElementById('googleButton'),{theme:'filled_black',size:'large',shape:'pill',text:'continue_with',width:400})}
+ const timer=setInterval(()=>{if(window.google?.accounts?.id){clearInterval(timer);initGoogle()}},250);
+})();
+</script>
+</body>
+</html>
