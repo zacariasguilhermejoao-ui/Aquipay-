@@ -5,7 +5,7 @@
   "observability": { "enabled": true },
   "vars": {
     "APP_ORIGIN": "https://aquipay.isabstudio.dev",
-    "EXTRA_ORIGINS": "https://ancient-star-9c8c.osamariches.workers.dev",
+    "EXTRA_ORIGINS": "https://ancient-star-9c8c.osamariches.workers.dev,https://localhost,capacitor://localhost,http://localhost",
     "MAIL_FROM": "no-reply@isabstudio.dev",
     "VAPID_PUBLIC_KEY": "BH-wW8rBNSru4t4iAiHetwaqYhLpaq59JitYbwYEpYzk9bc4W9vy25QxwFCn5bjlQ12PaO15ufvQS7ivcU_4D6g"
   },
