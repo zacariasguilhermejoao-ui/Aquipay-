@@ -1,4 +1,4 @@
-const H={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
+const H={"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","x-frame-options":"DENY","referrer-policy":"strict-origin-when-cross-origin","strict-transport-security":"max-age=63072000; includeSubDomains; preload"};
 const enc=new TextEncoder();
 const out=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...H,...extra}});
 const err=(message,status=400)=>out({error:message},status);
