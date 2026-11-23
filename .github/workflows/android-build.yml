@@ -443,7 +443,7 @@ jobs:
 
           # Make the validated store password available to the release Gradle step
           # without exposing it in logs.
-          printf 'AQUIPAY_EFFECTIVE_STORE_PASSWORD=%s\\n' "$EFFECTIVE_STORE_PASSWORD" >> "$GITHUB_ENV"
+          printf 'AQUIPAY_EFFECTIVE_STORE_PASSWORD=%s\n' "$EFFECTIVE_STORE_PASSWORD" >> "$GITHUB_ENV"
 
           echo "Keystore, store password, alias, and private-key password validated."
 
