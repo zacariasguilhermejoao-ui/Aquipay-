@@ -217,7 +217,8 @@ jobs:
           # operation does not accept -keypass; Gradle validates the private-key password at signing.
           if ! keytool -list -v -keystore android/release.keystore \
               -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-              -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
+              -alias "$ANDROID_KEY_ALIAS" \
+              -keypass "$ANDROID_KEY_PASSWORD" >/dev/null 2>&1; then
             echo "::error::Keystore validation failed. Check the Base64, keystore password, and alias secrets."
             exit 1
           fi
