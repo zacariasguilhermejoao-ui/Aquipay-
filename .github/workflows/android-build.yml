@@ -84,7 +84,6 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(ShareReceiverPlugin.class);
                   super.onCreate(savedInstanceState);
-                  dispatchSharedIntent(getIntent());
               }
 
               @Override
