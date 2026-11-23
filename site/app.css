@@ -199,3 +199,15 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proposal-compose{display:flex;flex-direction:column;gap:.85rem;padding-bottom:.5rem}
 .proposal-compose textarea{min-height:8rem;line-height:1.6}
 .post-menu{padding-bottom:.4rem}
+
+/* Conversas: estado de leitura e ação para marcar como não lida */
+.chat-row{display:flex;align-items:center;gap:.7rem;padding:.8rem;margin-bottom:.65rem}
+.chat-open{display:flex;align-items:center;gap:.7rem;flex:1;min-width:0;text-align:left;background:transparent;border:0;color:inherit;padding:0;cursor:pointer}
+.chat-row-copy{display:flex;flex-direction:column;gap:.18rem;min-width:0;flex:1}
+.chat-row-copy b,.chat-row-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-row-copy small{color:var(--mu)}
+.chat-read-state{font-size:.7rem;color:var(--mu)}
+.chat-unread .chat-row-copy b,.chat-unread .chat-read-state{color:var(--p);font-weight:700}
+.chat-mark{border:1px solid var(--in);background:transparent;color:var(--p);border-radius:.65rem;padding:.5rem .6rem;font:600 .72rem var(--ff);max-width:8.5rem;cursor:pointer}
+/* Barra de idiomas mais abaixo, alinhada ao centro */
+.langbar{justify-content:center;padding:1.85rem .8rem .65rem;gap:.3rem}
