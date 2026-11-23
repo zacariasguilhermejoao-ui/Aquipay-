@@ -53,7 +53,7 @@ export async function handleGooglePlayBilling(req,env,me){
     if(!check)return response({error:"A compra foi validada, mas não foi possível creditar as moedas. Tenta novamente."},503);
    }
   }
-  try{await googleRequest(env,"/purchases/products/"+encodeURIComponent(productId)+"/tokens/"+encodeURIComponent(purchaseToken)+":consume","POST")}catch(e){console.error("Google Play consume pending",e.message)}
+  try{await googleRequest(env,"/purchases/products/"+encodeURIComponent(productId)+"/tokens/"+encodeURIComponent(purchaseToken)+":consume","POST");await env.DB.prepare("UPDATE google_play_purchases SET acknowledged=1,updated_at=? WHERE purchase_token_hash=?").bind(now,tokenHash).run()}catch(e){console.error("Google Play consume pending",e.message)}
   const wallet=await env.DB.prepare("SELECT available_coins FROM wallets WHERE user_id=?").bind(me.id).first();
   return response({ok:true,credited,coins:Number(wallet?.available_coins||0),message:credited?"Moedas creditadas.":"Esta compra já tinha sido processada."});
  }
@@ -62,7 +62,7 @@ export async function handleGooglePlayBilling(req,env,me){
  let sub;try{sub=await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken))}catch{return response({error:"Não foi possível validar a assinatura na Google Play."},503)}
  const line=(sub.lineItems||[]).find(x=>x.productId===plusProduct&&x.offerDetails?.basePlanId===basePlan);
  const active=["SUBSCRIPTION_STATE_ACTIVE","SUBSCRIPTION_STATE_IN_GRACE_PERIOD","SUBSCRIPTION_STATE_CANCELED"].includes(sub.subscriptionState),expiresAt=line?.expiryTime;
- if(!line||!active||!expiresAt||Date.parse(expiresAt)<=Date.now())return response({error:"A assinatura Plus não está ativa ou não corresponde ao plano mensal."},409);
+ if(!line||!active||!expiresAt||!Number.isFinite(Date.parse(expiresAt))||Date.parse(expiresAt)<=Date.now())return response({error:"A assinatura Plus não está ativa ou não corresponde ao plano mensal."},409);
  const existing=await env.DB.prepare("SELECT user_id,product_id FROM google_play_purchases WHERE purchase_token_hash=?").bind(tokenHash).first();
  if(existing&&(existing.user_id!==me.id||existing.product_id!==plusProduct))return response({error:"Esta assinatura já está associada a outra conta."},409);
  if(!existing){
@@ -72,7 +72,7 @@ export async function handleGooglePlayBilling(req,env,me){
  }
  await env.DB.prepare("INSERT INTO user_subscriptions(user_id,product_id,status,expires_at,updated_at) VALUES(?,?,'active',?,?) ON CONFLICT(user_id) DO UPDATE SET product_id=excluded.product_id,status='active',expires_at=MAX(user_subscriptions.expires_at,excluded.expires_at),updated_at=excluded.updated_at").bind(me.id,plusProduct,expiresAt,now).run();
  if(sub.acknowledgementState!=="ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"){
-  try{await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken)+":acknowledge","POST")}catch(e){console.error("Google Play subscription acknowledge pending",e.message)}
+  try{await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken)+":acknowledge","POST");await env.DB.prepare("UPDATE google_play_purchases SET acknowledged=1,updated_at=? WHERE purchase_token_hash=?").bind(now,tokenHash).run()}catch(e){console.error("Google Play subscription acknowledge pending",e.message)}
  }
  return response({ok:true,plusActive:true,expiresAt});
 }
