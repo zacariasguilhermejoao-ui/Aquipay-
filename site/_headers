@@ -7,4 +7,4 @@
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Cross-Origin-Opener-Policy: same-origin-allow-popups
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https:; connect-src 'self' https://aquipay-api.osamariches.workers.dev https://accounts.google.com; frame-src https://accounts.google.com; media-src 'self' blob: https://aquipay-api.osamariches.workers.dev; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob: https:; connect-src 'self' https://aquipay-api.osamariches.workers.dev https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; media-src 'self' blob: https://aquipay-api.osamariches.workers.dev; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
