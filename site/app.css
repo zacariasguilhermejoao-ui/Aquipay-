@@ -149,3 +149,7 @@ h4{color:var(--p);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;
 .pw-toggle:active{background:var(--card)}
 .pw-toggle .i{width:1.2rem;height:1.2rem}
 .pw-toggle:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+
+
+/* Página 404 */
+.notfound{min-height:calc(100dvh - 5rem);max-width:30rem;margin:0 auto;padding:2rem 1.5rem 3rem;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1rem}.nf-mark{margin-bottom:1.5rem}.nf-mark .logo img{width:min(62vw,13rem);height:auto;max-height:4rem}.nf-code{font-size:clamp(5rem,25vw,8rem);font-weight:850;letter-spacing:-.09em;line-height:.95;color:var(--p);text-shadow:0 12px 35px rgba(124,58,237,.15)}.notfound h1{font-size:1.5rem;letter-spacing:-.04em}.notfound p{max-width:19rem;color:var(--mu);line-height:1.65}.notfound .btn{max-width:20rem;margin-top:.5rem}.nf-link{font-size:.9rem;color:var(--mu);font-weight:600}
