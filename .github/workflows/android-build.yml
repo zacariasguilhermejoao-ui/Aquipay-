@@ -413,23 +413,37 @@ jobs:
           echo "Keystore file identification:"
           file android/release.keystore || true
 
-          if ! keytool -list -keystore android/release.keystore \
+          # Accept either configured password in the store-password slot. This
+          # safely handles the common case where the two GitHub secrets were swapped.
+          if keytool -list -keystore android/release.keystore \
               -storepass "$ANDROID_KEYSTORE_PASSWORD" \
               >"$RUNNER_TEMP/keystore-check.log" 2>&1; then
-            echo "::error::Keystore could not be opened. Safe keytool diagnostic follows (password values are not printed):"
+            EFFECTIVE_STORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+            echo "Keystore opened with ANDROID_KEYSTORE_PASSWORD."
+          elif keytool -list -keystore android/release.keystore \
+              -storepass "$ANDROID_KEY_PASSWORD" \
+              >"$RUNNER_TEMP/keystore-check-key-password.log" 2>&1; then
+            EFFECTIVE_STORE_PASSWORD="$ANDROID_KEY_PASSWORD"
+            echo "::warning::Keystore opened with ANDROID_KEY_PASSWORD. The two password secrets appear to be swapped; using the working value for storePassword."
+          else
+            echo "::error::Neither configured password can open the decoded keystore. Safe diagnostic:"
             cat "$RUNNER_TEMP/keystore-check.log"
-            echo "::error::Check that ANDROID_KEYSTORE_BASE64 is the Base64 of the original .jks/.keystore file and that ANDROID_KEYSTORE_PASSWORD is its store password."
+            echo "The alternate password was also rejected. Confirm the original keystore file and its store password; do not create a new signing key for an existing app."
             exit 1
           fi
 
           if ! keytool -list -keystore android/release.keystore \
-              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -storepass "$EFFECTIVE_STORE_PASSWORD" \
               -alias "$ANDROID_KEY_ALIAS" \
               >"$RUNNER_TEMP/keystore-alias-check.log" 2>&1; then
             echo "::error::Keystore opened, but ANDROID_KEY_ALIAS was not found. Safe keytool diagnostic follows:"
             cat "$RUNNER_TEMP/keystore-alias-check.log"
             exit 1
           fi
+
+          # Make the validated store password available to the release Gradle step
+          # without exposing it in logs.
+          printf 'AQUIPAY_EFFECTIVE_STORE_PASSWORD=%s\\n' "$EFFECTIVE_STORE_PASSWORD" >> "$GITHUB_ENV"
 
           echo "Keystore, store password, alias, and private-key password validated."
 
@@ -453,7 +467,7 @@ jobs:
               signingConfigs {
                   release {
                       storeFile file("../release.keystore")
-                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      storePassword System.getenv("AQUIPAY_EFFECTIVE_STORE_PASSWORD")
                       keyAlias System.getenv("ANDROID_KEY_ALIAS")
                       keyPassword System.getenv("ANDROID_KEY_PASSWORD")
                   }
