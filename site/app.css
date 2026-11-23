@@ -116,3 +116,24 @@ h4{color:var(--p);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;
 
 .search-top input:placeholder-shown+.search-clear{display:none}
 .ho>div{min-width:0}
+/* idiomas no topo */
+.langbar{flex:none;display:flex;justify-content:flex-end;gap:.15rem;padding:.4rem .8rem 0}
+.lb{border:0;background:transparent;color:var(--mu);font:600 .85rem var(--ff);min-height:2rem;padding:.3rem .7rem;border-radius:.65rem;cursor:pointer}
+.lb.on{background:var(--card);color:var(--tx)}
+.lb:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+/* pesquisa: lupa e X dentro do campo, um só X */
+.sf{position:relative;flex:1;min-width:0;display:flex;align-items:center}
+.sf>.i{position:absolute;left:1rem;width:1.1rem;height:1.1rem;color:var(--mu);pointer-events:none}
+.sf input{width:100%;min-width:0;border:0;outline:0;background:var(--in);color:var(--tx);border-radius:999px;font:inherit;padding:.72rem 2.7rem;-webkit-appearance:none;appearance:none}
+.sf input::-webkit-search-cancel-button,.sf input::-webkit-search-decoration,.sf input::-webkit-search-results-button,.sf input::-webkit-search-results-decoration{-webkit-appearance:none;appearance:none;display:none}
+.sf input:focus-visible{box-shadow:0 0 0 2px var(--p)}
+.sf .search-clear{position:absolute;right:.3rem;width:2.1rem;height:2.1rem;padding:0;border-radius:50%;cursor:pointer}
+.sf input:placeholder-shown+.search-clear{display:none}
+/* ícones do topo sem círculo lilás; + ao lado da pesquisa */
+.top .btn.ic,.search-top .btn.ic{background:transparent;color:var(--p);box-shadow:none;overflow:visible;border-radius:50%}
+.top .btn.ic:active,.search-top .btn.ic:active{background:var(--in)}
+.top .btn.ic .rp,.search-top .btn.ic .rp{background:rgba(124,58,237,.18)}
+.search-top .btn.add{flex:none;width:2.6rem;min-height:2.6rem}
+.search-top .btn.add .i{width:1.75rem;height:1.75rem;stroke-width:2.4}
+.top .bdg{top:.05rem;right:0;background:var(--p);color:#fff}
+.rep{margin-top:.6rem;font-size:.82rem;color:var(--mu)}
