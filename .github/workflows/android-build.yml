@@ -366,6 +366,22 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
+      - name: Resolve AndroidX Browser dependency conflict
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          gradle = Path("android/build.gradle")
+          if not gradle.is_file():
+              raise SystemExit("android/build.gradle was not generated")
+          source = gradle.read_text(encoding="utf-8")
+          rule = "// AquiPay: align AndroidX Browser for native Google Credential Manager\\nallprojects {\\n    configurations.configureEach {\\n        resolutionStrategy.force 'androidx.browser:browser:1.9.0'\\n    }\\n}\\n"
+          if "AquiPay: align AndroidX Browser" not in source:
+              source = source.rstrip() + "\\n\\n" + rule
+              gradle.write_text(source, encoding="utf-8")
+          print("AndroidX Browser forced to 1.9.0 for consistent plugin compilation.")
+          PY
+
       - name: Configure encrypted storage backup exclusions
         run: |
           mkdir -p android/app/src/main/res/xml
