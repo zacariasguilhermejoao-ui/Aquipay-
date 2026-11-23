@@ -1,7 +1,7 @@
 const enc=new TextEncoder();
-const b64u=value=>{const bytes=typeof value==="string"?enc.encode(value):value;let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,"")};
-const fromB64=s=>Uint8Array.from(atob(String(s).replace(/-/g,"+").replace(/_/g,"/").replace(/=+$/,"")),c=>c.charCodeAt(0));
-const pemBytes=pem=>fromB64(String(pem||"").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g,""));
+const b64u=value=>{const bytes=typeof value==="string"?enc.encode(value):value;let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")};
+const fromB64=s=>{const v=String(s).replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from(atob(v+"=".repeat((4-v.length%4)%4)),c=>c.charCodeAt(0))};
+const pemBytes=pem=>fromB64(String(pem||"").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,""));
 const clean=(v,n=500)=>typeof v==="string"?v.trim().slice(0,n):"";
 const response=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 let cachedAccessToken="",cachedUntil=0;
@@ -37,11 +37,10 @@ export async function handleGooglePlayBilling(req,env,me){
   const line=(purchase.productLineItem||[]).find(x=>x.productId===productId);
   if(!line)return response({error:"O produto confirmado não corresponde ao pacote solicitado."},403);
   const existing=await env.DB.prepare("SELECT user_id,product_id FROM google_play_purchases WHERE purchase_token=?").bind(purchaseToken).first();
-  if(existing&& (existing.user_id!==me.id||existing.product_id!==productId))return response({error:"Esta compra já está associada a outra conta ou produto."},409);
+  if(existing&&(existing.user_id!==me.id||existing.product_id!==productId))return response({error:"Esta compra já está associada a outra conta ou produto."},409);
   let credited=false;
   if(!existing){
-   const amount=Number(pack.coins)+Number(pack.bonus||0);
-   const ledgerKey="googleplay:"+purchaseToken;
+   const amount=Number(pack.coins)+Number(pack.bonus||0),ledgerKey="googleplay:"+purchaseToken;
    try{
     const result=await env.DB.batch([
      env.DB.prepare("INSERT INTO google_play_purchases(purchase_token,user_id,product_id,purchase_type,order_id,coins_granted,status,created_at) VALUES(?,?,?,'coins',?,?,'verified',?)").bind(purchaseToken,me.id,productId,purchase.orderId||null,amount,now),
@@ -49,7 +48,7 @@ export async function handleGooglePlayBilling(req,env,me){
      env.DB.prepare("INSERT INTO wallets(user_id,available_coins,pending_coins) VALUES(?,?,0) ON CONFLICT(user_id) DO UPDATE SET available_coins=available_coins+excluded.available_coins,updated_at=?").bind(me.id,amount,now)
     ]);
     credited=!!result?.[0]?.meta?.changes;
-   }catch(e){
+   }catch{
     const check=await env.DB.prepare("SELECT user_id FROM google_play_purchases WHERE purchase_token=?").bind(purchaseToken).first();
     if(!check)return response({error:"A compra foi validada, mas não foi possível creditar as moedas. Tenta novamente."},503);
    }
@@ -60,13 +59,12 @@ export async function handleGooglePlayBilling(req,env,me){
  }
  const plusProduct=clean(env.GOOGLE_PLAY_PLUS_PRODUCT_ID,120),basePlan=clean(env.GOOGLE_PLAY_PLUS_BASE_PLAN_ID,120);
  if(!plusProduct||!basePlan||productId!==plusProduct)return response({error:"Produto Plus ainda não configurado."},503);
- let sub;try{sub=await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken))}catch(e){return response({error:"Não foi possível validar a assinatura na Google Play."},503)}
+ let sub;try{sub=await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken))}catch{return response({error:"Não foi possível validar a assinatura na Google Play."},503)}
  const line=(sub.lineItems||[]).find(x=>x.productId===plusProduct&&x.offerDetails?.basePlanId===basePlan);
- const active=["SUBSCRIPTION_STATE_ACTIVE","SUBSCRIPTION_STATE_IN_GRACE_PERIOD"].includes(sub.subscriptionState);
- const expiresAt=line?.expiryTime;
+ const active=["SUBSCRIPTION_STATE_ACTIVE","SUBSCRIPTION_STATE_IN_GRACE_PERIOD"].includes(sub.subscriptionState),expiresAt=line?.expiryTime;
  if(!line||!active||!expiresAt||Date.parse(expiresAt)<=Date.now())return response({error:"A assinatura Plus não está ativa ou não corresponde ao plano mensal."},409);
  const existing=await env.DB.prepare("SELECT user_id,product_id FROM google_play_purchases WHERE purchase_token=?").bind(purchaseToken).first();
- if(existing&& (existing.user_id!==me.id||existing.product_id!==plusProduct))return response({error:"Esta assinatura já está associada a outra conta."},409);
+ if(existing&&(existing.user_id!==me.id||existing.product_id!==plusProduct))return response({error:"Esta assinatura já está associada a outra conta."},409);
  if(!existing){
   try{await env.DB.prepare("INSERT INTO google_play_purchases(purchase_token,user_id,product_id,purchase_type,order_id,coins_granted,status,created_at) VALUES(?,?,?,'plus',?,0,'verified',?)").bind(purchaseToken,me.id,plusProduct,sub.latestOrderId||null,now).run()}catch{
    const check=await env.DB.prepare("SELECT user_id FROM google_play_purchases WHERE purchase_token=?").bind(purchaseToken).first();if(check?.user_id!==me.id)return response({error:"Esta assinatura já está associada a outra conta."},409);
