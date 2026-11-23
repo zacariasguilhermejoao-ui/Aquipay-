@@ -269,3 +269,5 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .onboard-controls .btn{flex:1;min-height:3.2rem}
 .onboard-controls .btn.secondary{background:var(--in);color:var(--tx)}
 @media(min-height:760px){.onboard-art{min-height:300px;margin-top:1rem;margin-bottom:1.8rem}}
+
+.contacts-invite{display:flex;flex-direction:column;gap:.65rem;padding:1rem;margin:1rem 0;background:var(--card);border:1px solid color-mix(in srgb,var(--p) 28%,transparent);border-radius:1rem}.contacts-invite p{margin-top:.2rem}.contacts-invite small{font-size:.75rem;line-height:1.4;color:var(--mu)}
