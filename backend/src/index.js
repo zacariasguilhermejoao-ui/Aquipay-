@@ -1,3 +1,4 @@
+import { handleGooglePlayBilling } from "./google-play-billing.js";
 const H={"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","x-frame-options":"DENY","referrer-policy":"strict-origin-when-cross-origin","strict-transport-security":"max-age=63072000; includeSubDomains; preload"};
 const enc=new TextEncoder();
 const out=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...H,...extra}});
@@ -259,6 +260,7 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   return out({ok:true});
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
+if(p==='/api/billing/google/verify'&&m==='POST')return handleGooglePlayBilling(req,env,me);
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
 // Correspondência de contactos: os números recebidos são usados apenas em memória e nunca são guardados.
 if(p==='/api/contacts/match'&&m==='POST'){
