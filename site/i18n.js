@@ -450,6 +450,29 @@ const DICT = [
 
   /* ——— descrição do site ——— */
   ['Trabalhos, produtos e serviços no Aquipay', 'Jobs, products and services on Aquipay', 'Emplois, produits et services sur Aquipay', '在 Aquipay 上找工作、产品和服务'],
+
+  /* ——— identidade verbal Aquipay ——— */
+  ['Junta-te ao Aquipay', 'Join Aquipay', 'Rejoignez Aquipay', '加入 Aquipay'],
+  ['Acede à tua conta', 'Access your account', 'Accédez à votre compte', '登录你的账户'],
+  ['Pesquisar oportunidades, serviços e profissionais', 'Search opportunities, services and professionals', 'Rechercher des opportunités, des services et des professionnels', '搜索机会、服务和专业人士'],
+  ['Oportunidades', 'Opportunities', 'Opportunités', '机会'],
+  ['Os meus anúncios', 'My listings', 'Mes annonces', '我的发布'],
+  ['Sem anúncios por enquanto', 'No listings yet', 'Aucune annonce pour le moment', '目前还没有发布'],
+  ['Esta área ainda não tem publicações. Cria o primeiro anúncio e dá visibilidade à tua oportunidade.', 'There are no listings here yet. Create the first listing and give your opportunity visibility.', 'Aucune annonce dans cette rubrique pour le moment. Publiez la première offre et donnez de la visibilité à votre opportunité.', '此处暂时没有发布内容。创建第一条信息，让更多人看到你的机会。'],
+  ['Ainda sem candidaturas', 'No applications yet', 'Aucune candidature pour le moment', '暂无申请'],
+  ['As propostas que apresentares ficarão reunidas nesta área.', 'The proposals you submit will be collected here.', 'Les propositions que vous soumettez seront regroupées ici.', '你提交的提案将集中显示在这里。'],
+  ['Ainda não publicaste anúncios', 'You haven’t published any listings yet', 'Vous n’avez pas encore publié d’annonces', '你还没有发布任何信息'],
+  ['Os anúncios que criares serão apresentados aqui, para acompanhares as respostas num só lugar.', 'Your listings will appear here, so you can follow every response in one place.', 'Vos annonces apparaîtront ici afin de suivre toutes les réponses au même endroit.', '你发布的信息会显示在这里，方便你集中查看所有回复。'],
+  ['Apresentar proposta', 'Submit a proposal', 'Présenter une proposition', '提交提案'],
+  ['Proposta enviada', 'Proposal sent', 'Proposition envoyée', '提案已发送'],
+  ['Conhecer profissionais', 'Discover professionals', 'Découvrir des professionnels', '认识专业人士'],
+  ['A tua caixa de mensagens está vazia', 'Your inbox is empty', 'Votre boîte de réception est vide', '收件箱为空'],
+  ['Quando apresentares ou receberes uma proposta, a conversa ficará disponível aqui.', 'When you submit or receive a proposal, the conversation will appear here.', 'Lorsque vous soumettez ou recevez une proposition, la conversation apparaîtra ici.', '当你提交或收到提案时，对话会显示在这里。'],
+  ['Tudo em dia', 'You’re all caught up', 'Tout est à jour', '一切已更新'],
+  ['As atualizações importantes da tua conta serão apresentadas aqui.', 'Important updates about your account will appear here.', 'Les mises à jour importantes de votre compte apparaîtront ici.', '与你账户相关的重要更新将在这里显示。'],
+  ['Não foi possível atualizar o conteúdo. Tenta novamente dentro de instantes.', 'We couldn’t refresh the content. Please try again shortly.', 'Impossible d’actualiser le contenu. Réessayez dans quelques instants.', '暂时无法更新内容，请稍后重试。'],
+  ['Informação atualizada.', 'Information updated.', 'Informations mises à jour.', '信息已更新。'],
+  ['A tua conta Aquipay está ativa. Recebeste 10 moedas de boas-vindas.', 'Your Aquipay account is active. You received 10 welcome coins.', 'Votre compte Aquipay est actif. Vous avez reçu 10 pièces de bienvenue.', '你的 Aquipay 账户已启用，并获得 10 枚欢迎金币。'],
 ];
 
 /* tabelas: pt → texto, por idioma */
