@@ -378,14 +378,14 @@ jobs:
           rule = """// AquiPay: align AndroidX Browser for native Google Credential Manager
           allprojects {
               configurations.configureEach {
-                  resolutionStrategy.force 'androidx.browser:browser:1.9.0'
+                  resolutionStrategy.force 'androidx.browser:browser:1.8.0'
               }
           }
           """
           if "AquiPay: align AndroidX Browser" not in source:
               source = source.rstrip() + "\n\n" + rule
               gradle.write_text(source, encoding="utf-8")
-          print("AndroidX Browser forced to 1.9.0 for consistent plugin compilation.")
+          print("AndroidX Browser pinned to 1.8.0, compatible with compileSdk 35 and AGP 8.7.2.")
           PY
 
       - name: Configure encrypted storage backup exclusions
