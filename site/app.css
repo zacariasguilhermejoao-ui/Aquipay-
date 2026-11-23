@@ -271,3 +271,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 @media(min-height:760px){.onboard-art{min-height:300px;margin-top:1rem;margin-bottom:1.8rem}}
 
 .contacts-invite{display:flex;flex-direction:column;gap:.65rem;padding:1rem;margin:1rem 0;background:var(--card);border:1px solid color-mix(in srgb,var(--p) 28%,transparent);border-radius:1rem}.contacts-invite p{margin-top:.2rem}.contacts-invite small{font-size:.75rem;line-height:1.4;color:var(--mu)}
+
+.onboard-art{background:#000;border:0;min-height:clamp(250px,39vh,390px)}
+.onboard-character{display:block;width:100%;height:100%;max-height:390px;object-fit:contain;object-position:center bottom;position:relative;z-index:1}
+@media(max-height:700px){.onboard-art{min-height:220px;max-height:34vh}.onboard-character{max-height:34vh}}
