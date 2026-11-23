@@ -1,106 +1,100 @@
 /**
- * Aquipay - Google Play Billing (moedas)
- * Usa @capgo/native-purchases
+ * AquiPay — integração segura com Google Play Billing.
+ * Os IDs são definidos em PLAY_PRODUCTS depois de serem criados no Play Console.
+ * Nunca credita moedas no dispositivo: a confirmação vem exclusivamente do Worker.
  */
-
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import { Capacitor } from '@capacitor/core';
 
-// Mapeamento Product ID → quantidade de moedas
-export const COIN_PRODUCTS = {
-  coins_10:  { coins: 10,  bonus: 0 },
-  coins_50:  { coins: 50,  bonus: 0 },
-  coins_110: { coins: 110, bonus: 10 },
-  coins_240: { coins: 240, bonus: 40 },
-  coins_650: { coins: 650, bonus: 150 },
+export const PLAY_PRODUCTS = {
+  coins: [
+    { id: 'coins_10', coins: 10, bonus: 0 },
+    { id: 'coins_50', coins: 50, bonus: 0 },
+    { id: 'coins_110', coins: 110, bonus: 10 },
+    { id: 'coins_240', coins: 240, bonus: 40 },
+    { id: 'coins_650', coins: 650, bonus: 150 },
+  ],
+  plus: { id: '', basePlanId: '' },
 };
 
-/**
- * Verifica se estamos na app nativa Android
- */
-export function isNativeAndroid() {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-}
+const nativeAndroid = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+let billingReady = false;
 
-/**
- * Inicializa o sistema de compras (chamar no arranque da app)
- */
 export async function initPurchases() {
-  if (!isNativeAndroid()) return { ok: false, reason: 'web' };
-
+  if (!nativeAndroid()) return { ok: false, reason: 'android_only' };
   try {
-    // O plugin trata da ligação ao Play Billing automaticamente
-    return { ok: true };
-  } catch (e) {
-    console.error('Erroases init error:', e);
-    return { ok: false, reason: e?.message || 'erro' };
+    const { isBillingSupported } = await NativePurchases.isBillingSupported();
+    billingReady = !!isBillingSupported;
+    return { ok: billingReady, reason: billingReady ? null : 'billing_unavailable' };
+  } catch (error) {
+    billingReady = false;
+    return { ok: false, reason: error?.message || 'billing_error' };
   }
 }
 
-/**
- * Compra um pacote de moedas
- * @param {string} productId - ex: 'coins_50'
- * @returns {Promise<{success: boolean, coins?: number, error?: string}>}
- */
-export async function buyCoins(productId) {
-  if (!isNativeAndroid()) {
-    return { success: false, error: 'Compras só disponíveis na app Android' };
+export async function loadCoinProducts() {
+  if (!nativeAndroid()) throw new Error('Compras disponíveis apenas na aplicação Android.');
+  if (!billingReady) {
+    const ready = await initPurchases();
+    if (!ready.ok) throw new Error('A Google Play Billing não está disponível neste dispositivo.');
   }
-
-  const pack = COIN_PRODUCTS[productId];
-  if (!pack) {
-    return { success: false, error: 'Produto inválido' };
-  }
-
-  try {
-    const result = await NativePurchases.purchaseProduct({
-      productIdentifier: productId,
-      productType: PURCHASE_TYPE.INAPP,
-    });
-
-    // Sucesso → creditar moedas
-    const totalCoins = pack.coins + (pack.bonus || 0);
-
-    // Aqui deves chamar o teu backend para creditar as moedas de forma segura
-    // Exemplo:
-    // await api('/api/coins/purchase', {
-    //   method: 'POST',
-    //   body: JSON.stringify({
-    //     productId,
-    //     purchaseToken: result.purchaseToken,
-    //     orderId: result.orderId
-    //   })
-    // });
-
-    return {
-      success: true,
-      coins: totalCoins,
-      productId,
-      // Guarda estes dados se quiseres validar no servidor
-      purchaseToken: result?.purchaseToken,
-      orderId: result?.orderId,
-    };
-  } catch (e) {
-    // Utilizador cancelou ou erro
-    const msg = e?.message || String(e);
-    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('user')) {
-      return { success: false, error: 'Compra cancelada' };
-    }
-    return { success: false, error: msg };
-  }
+  const ids = PLAY_PRODUCTS.coins.map(x => x.id);
+  const { products } = await NativePurchases.getProducts({ productIdentifiers: ids, productType: PURCHASE_TYPE.INAPP });
+  return products || [];
 }
 
-/**
- * Restaura compras (útil se o utilizador reinstalou a app)
- * Nota: moedas são consumíveis, por isso normalmente não há muito a restaurar
- */
+export async function loadPlusProduct() {
+  if (!nativeAndroid()) throw new Error('O Plus só pode ser comprado na aplicação Android.');
+  if (!PLAY_PRODUCTS.plus.id || !PLAY_PRODUCTS.plus.basePlanId) throw new Error('O produto e o plano mensal Plus serão ligados quando forem criados no Play Console.');
+  if (!billingReady) {
+    const ready = await initPurchases();
+    if (!ready.ok) throw new Error('A Google Play Billing não está disponível neste dispositivo.');
+  }
+  const { products } = await NativePurchases.getProducts({ productIdentifiers: [PLAY_PRODUCTS.plus.id], productType: PURCHASE_TYPE.SUBS });
+  return (products || []).filter(p => p.identifier === PLAY_PRODUCTS.plus.basePlanId || p.planIdentifier === PLAY_PRODUCTS.plus.id);
+}
+
+async function sendForVerification(api, type, productId, transaction) {
+  const purchaseToken = transaction?.purchaseToken;
+  if (!purchaseToken) throw new Error('A Google Play não devolveu o token da compra. Não foi efetuada qualquer creditação.');
+  return api('/api/billing/google/verify', {
+    method: 'POST',
+    body: JSON.stringify({ type, productId, purchaseToken }),
+  });
+}
+
+export async function buyCoins(productId, api) {
+  if (!nativeAndroid()) throw new Error('Compras só disponíveis na aplicação Android.');
+  const pack = PLAY_PRODUCTS.coins.find(x => x.id === productId);
+  if (!pack) throw new Error('Pacote de moedas inválido.');
+  const transaction = await NativePurchases.purchaseProduct({
+    productIdentifier: productId,
+    productType: PURCHASE_TYPE.INAPP,
+    quantity: 1,
+    isConsumable: true,
+    autoAcknowledgePurchases: false,
+  });
+  const verified = await sendForVerification(api, 'coins', productId, transaction);
+  return { success: true, credited: verified.credited === true, balance: verified.coins, productId };
+}
+
+export async function buyPlus(api) {
+  if (!nativeAndroid()) throw new Error('O Plus só pode ser comprado na aplicação Android.');
+  const { id, basePlanId } = PLAY_PRODUCTS.plus;
+  if (!id || !basePlanId) throw new Error('O produto e o plano mensal Plus ainda não foram ligados ao Play Console.');
+  const transaction = await NativePurchases.purchaseProduct({
+    productIdentifier: id,
+    planIdentifier: basePlanId,
+    productType: PURCHASE_TYPE.SUBS,
+    quantity: 1,
+    autoAcknowledgePurchases: false,
+  });
+  const verified = await sendForVerification(api, 'plus', id, transaction);
+  return { success: true, plusActive: verified.plusActive === true, expiresAt: verified.expiresAt };
+}
+
 export async function restorePurchases() {
-  if (!isNativeAndroid()) return { success: false };
-
-  try {
-    await NativePurchases.restorePurchases();
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e?.message };
-  }
+  if (!nativeAndroid()) return { success: false, reason: 'android_only' };
+  await NativePurchases.restorePurchases();
+  return { success: true, message: 'Compras recuperadas. O estado e os direitos devem ser sincronizados com o servidor.' };
 }
