@@ -170,3 +170,32 @@ input:not([type=checkbox]):not([type=radio]),textarea,select{background:var(--in
 input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{color:var(--mu);opacity:1}
 input:not([type=checkbox]):not([type=radio]):focus,textarea:focus,select:focus{border-color:var(--p);outline:0;box-shadow:0 0 0 2px color-mix(in srgb,var(--p) 25%,transparent)}
 input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--tx);-webkit-box-shadow:0 0 0 1000px var(--in) inset;transition:background-color 9999s ease-out 0s}
+
+/* Feed profissional: cartões, menu de três pontos e cabeçalho que acompanha o scroll */
+.home-scroll{padding:0 1rem 6rem;overflow-y:auto;overscroll-behavior:contain}
+.home-scroll>.search-top{margin:0 -1rem;position:relative}
+.home-scroll>.top{padding:.7rem 0}
+.home-scroll>.tabs{padding:0 0 .75rem}
+.feed-filter{padding:0 0 .9rem}
+.feed-filter .fd{margin:0}
+.post-card{padding:1rem 1rem 1.1rem;overflow:visible}
+.post-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.85rem}
+.post-author{min-width:0;flex:1}
+.post-author>div{overflow:hidden}
+.post-author b{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.post-more{display:flex;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;border:0;border-radius:50%;background:var(--in);color:var(--tx);cursor:pointer;flex:none}
+.post-more:active{background:var(--tab-on)}
+.post-title{font-size:1.12rem;line-height:1.35;margin:.15rem 0 .55rem}
+.post-meta{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.55rem}
+.post-meta .pill{font-size:.72rem}
+.post-card .pr{font-size:1.05rem;margin:.55rem 0 .8rem}
+.post-card .ph{margin:.25rem 0 .85rem}
+.post-card .ph img{aspect-ratio:16/10;max-height:24rem;object-fit:cover}
+.post-description{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:.96rem;margin:.7rem .1rem 1rem;padding:.15rem .1rem}
+.post-rating{display:flex;align-items:center;justify-content:space-between;gap:.6rem;border-top:1px solid var(--in);padding:.75rem 0;margin:.2rem 0 .8rem;font-size:.82rem;color:var(--mu)}
+.post-rating>span{display:flex;align-items:center;gap:.35rem}
+.post-rating .link{font-size:.8rem;background:none;border:0;padding:0}
+.post-proposal{margin-top:.2rem}
+.proposal-compose{display:flex;flex-direction:column;gap:.85rem;padding-bottom:.5rem}
+.proposal-compose textarea{min-height:8rem;line-height:1.6}
+.post-menu{padding-bottom:.4rem}
