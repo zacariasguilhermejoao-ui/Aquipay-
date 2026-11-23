@@ -1,4 +1,4 @@
-const V='aquipay-v29',SHELL=['./','index.html','app.css','i18n.js','legal.js','app.js','native-push.bundle.js','native-google.bundle.js','delete-account.html','manifest.json','aquipay-logo.webp','aquipay-logo-claro.webp','icon-192.png','icon-512.png','favicon.ico','favicon-32.png','apple-touch-icon.png'];
+const V='aquipay-limits-v12',SHELL=['./','index.html','app.css','i18n.js','legal.js','app.js','native-push.bundle.js','native-google.bundle.js','delete-account.html','manifest.json','aquipay-limits-v12.webp','aquipay-limits-v12.webp','icon-192.png','icon-512.png','favicon.ico','favicon-32.png','apple-touch-icon.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
