@@ -408,19 +408,42 @@ jobs:
           fi
           chmod 600 android/release.keystore
 
-          # Validate store password first, then alias; never print secret values.
-          if ! keytool -list -keystore android/release.keystore \
-              -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
-            echo "::error::Keystore file or ANDROID_KEYSTORE_PASSWORD is invalid. Recheck those two secrets."
-            exit 1
-          fi
+          # Diagnose the keystore without ever printing secret values.
+          echo "Decoded keystore size: $(stat -c '%s' android/release.keystore) bytes"
+          echo "Keystore file identification:"
+          file android/release.keystore || true
+
           if ! keytool -list -keystore android/release.keystore \
               -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-              -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
-            echo "::error::ANDROID_KEY_ALIAS does not match an entry in this keystore. Recheck that secret."
+              >"$RUNNER_TEMP/keystore-check.log" 2>&1; then
+            echo "::error::Keystore could not be opened. Safe keytool diagnostic follows (password values are not printed):"
+            cat "$RUNNER_TEMP/keystore-check.log"
+            echo "::error::Check that ANDROID_KEYSTORE_BASE64 is the Base64 of the original .jks/.keystore file and that ANDROID_KEYSTORE_PASSWORD is its store password."
             exit 1
           fi
-          echo "Keystore, store password, and alias validated."
+
+          if ! keytool -list -keystore android/release.keystore \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              >"$RUNNER_TEMP/keystore-alias-check.log" 2>&1; then
+            echo "::error::Keystore opened, but ANDROID_KEY_ALIAS was not found. Safe keytool diagnostic follows:"
+            cat "$RUNNER_TEMP/keystore-alias-check.log"
+            exit 1
+          fi
+
+          # Validate the private-key password independently where keytool supports it.
+          if ! keytool -keypasswd -keystore android/release.keystore \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              -keypass "$ANDROID_KEY_PASSWORD" \
+              -new "$ANDROID_KEY_PASSWORD" \
+              >"$RUNNER_TEMP/keystore-keypass-check.log" 2>&1; then
+            echo "::error::The key alias exists, but ANDROID_KEY_PASSWORD may not match the private-key password:"
+            cat "$RUNNER_TEMP/keystore-keypass-check.log"
+            exit 1
+          fi
+
+          echo "Keystore, store password, alias, and private-key password validated."
 
           python - <<'PY'
           from pathlib import Path
