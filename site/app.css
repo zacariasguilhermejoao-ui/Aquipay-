@@ -156,3 +156,9 @@ h4{color:var(--p);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;
 
 /* Ações de gestão dos anúncios próprios */
 .mine-actions{display:flex;align-items:center;gap:.6rem;margin-top:.75rem;flex-wrap:wrap}.mine-actions>.btn{flex:1;width:auto;margin-top:0}.danger-outline{color:var(--bad)!important;background:var(--in)!important;box-shadow:none!important}.danger-solid{background:var(--bad)!important;color:#fff!important;box-shadow:none!important}.sheet-grip{width:2.5rem;height:.25rem;border-radius:999px;background:var(--mu);opacity:.35;margin:-.35rem auto 1rem}
+
+
+/* Proteção contra seleção acidental e guardar imagens por toque prolongado */
+body,body *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable="true"],.linkbox{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+img{-webkit-user-drag:none;user-select:none;-webkit-touch-callout:none;pointer-events:none}
