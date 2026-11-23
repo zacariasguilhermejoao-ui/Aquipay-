@@ -2,7 +2,7 @@
   "name": "aquipay",
   "version": "1.0.0",
   "private": true,
-  "description": "Aquipay - Trabalhos e oportunidades perto de ti",
+  "description": "Aquipay",
   "scripts": {
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
