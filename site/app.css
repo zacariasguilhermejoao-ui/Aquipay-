@@ -137,3 +137,15 @@ h4{color:var(--p);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;
 .search-top .btn.add .i{width:1.75rem;height:1.75rem;stroke-width:2.4}
 .top .bdg{top:.05rem;right:0;background:var(--p);color:#fff}
 .rep{margin-top:.6rem;font-size:.82rem;color:var(--mu)}
+
+/* Ajustes da autenticação: idiomas centrados e campos de palavra-passe */
+.langbar{justify-content:center;padding:1rem .8rem .25rem;gap:.3rem}
+.auth{padding-top:1rem}
+.auth .logo{margin-top:.35rem}
+.auth-title{text-align:center;font-size:1.15rem;margin:.1rem 0}
+.pw-field{position:relative;width:100%}
+.pw-field input{padding-right:3.25rem}
+.pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:2.25rem;height:2.25rem;border:0;border-radius:50%;background:transparent;color:var(--mu);cursor:pointer}
+.pw-toggle:active{background:var(--card)}
+.pw-toggle .i{width:1.2rem;height:1.2rem}
+.pw-toggle:focus-visible{outline:2px solid var(--p);outline-offset:1px}
