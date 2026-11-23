@@ -5,7 +5,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "backend/**"
+      - "backend/src/**"
+      - "backend/wrangler.jsonc"
       - ".github/workflows/deploy-api.yml"
 
 jobs:
@@ -19,11 +20,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Apply AquiPay D1 migration
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4 d1 execute aquipay-db --remote --file backend/migrations/0012_user_subscriptions.sql --config backend/wrangler.jsonc
 
       - name: Deploy AquiPay API Worker
         env:
