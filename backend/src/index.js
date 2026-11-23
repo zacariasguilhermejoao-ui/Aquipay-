@@ -242,16 +242,26 @@ async function broadcastPost(env,authorId,title,kind){
 }
 async function purgeExpiredAccounts(env){
  const now=new Date().toISOString(),due=await env.DB.prepare("SELECT id FROM users WHERE status='active' AND deletion_due_at IS NOT NULL AND deletion_due_at<=? ORDER BY deletion_due_at LIMIT 25").bind(now).all();
- for(const row of due.results||[]){const id=row.id,docs=(await env.DB.prepare('SELECT object_key FROM documents WHERE user_id=?').bind(id).all()).results||[],profile=await env.DB.prepare('SELECT avatar_key,resume_key,intro_video_key FROM profiles WHERE user_id=?').bind(id).first();
-  if(env.MEDIA){const keys=[...docs.map(x=>x.object_key),profile?.avatar_key,profile?.resume_key,profile?.intro_video_key].filter(Boolean);for(const key of keys){try{await env.MEDIA.delete(key)}catch(e){console.error('account media purge',id,e)}}}
-  await env.DB.batch([
-   env.DB.prepare('DELETE FROM messages WHERE sender_id=? OR conversation_id IN (SELECT id FROM conversations WHERE participant_a=? OR participant_b=?)').bind(id,id,id),
-   env.DB.prepare('DELETE FROM proposals WHERE sender_id=? OR receiver_id=? OR listing_id IN (SELECT id FROM listings WHERE owner_id=?)').bind(id,id,id),
-   env.DB.prepare('DELETE FROM conversations WHERE participant_a=? OR participant_b=?').bind(id,id),
-   env.DB.prepare('DELETE FROM listings WHERE owner_id=?').bind(id),
-   env.DB.prepare('DELETE FROM wallet_ledger WHERE user_id=?').bind(id),
-   env.DB.prepare('DELETE FROM users WHERE id=? AND deletion_due_at IS NOT NULL AND deletion_due_at<=?').bind(id,now)
-  ]);
+ for(const row of due.results||[]){
+  const id=row.id;
+  try{
+   const docs=(await env.DB.prepare('SELECT object_key FROM documents WHERE user_id=?').bind(id).all()).results||[];
+   const profile=await env.DB.prepare('SELECT avatar_key,resume_key,intro_video_key FROM profiles WHERE user_id=?').bind(id).first();
+   if(env.MEDIA){
+    const keys=[...docs.map(x=>x.object_key),profile?.avatar_key,profile?.resume_key,profile?.intro_video_key].filter(Boolean);
+    let failed=false;
+    for(const key of keys){try{await env.MEDIA.delete(key)}catch(e){failed=true;console.error('account media purge',id,e)}}
+    if(failed)continue;
+   }
+   await env.DB.batch([
+    env.DB.prepare('DELETE FROM messages WHERE sender_id=? OR conversation_id IN (SELECT id FROM conversations WHERE participant_a=? OR participant_b=?)').bind(id,id,id),
+    env.DB.prepare('DELETE FROM conversations WHERE participant_a=? OR participant_b=?').bind(id,id),
+    env.DB.prepare('DELETE FROM proposals WHERE sender_id=? OR receiver_id=? OR listing_id IN (SELECT id FROM listings WHERE owner_id=?)').bind(id,id,id),
+    env.DB.prepare('DELETE FROM listings WHERE owner_id=?').bind(id),
+    env.DB.prepare('DELETE FROM wallet_ledger WHERE user_id=?').bind(id),
+    env.DB.prepare('DELETE FROM users WHERE id=? AND deletion_due_at IS NOT NULL AND deletion_due_at<=?').bind(id,now)
+   ]);
+  }catch(e){console.error('account purge failed',id,e)}
  }
 }
 export default {async fetch(req,env,ctx){const origin=req.headers.get('origin'),allowedList=[env.APP_ORIGIN,...String(env.EXTRA_ORIGINS||'').split(',')].map(x=>x.trim()).filter(Boolean),allowed=allowedList.includes(origin)?origin:(env.APP_ORIGIN||''),cors=origin===allowed?{'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','access-control-max-age':'86400','vary':'Origin'}:{};if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});if(origin&&origin!==allowed)return err('Origem não autorizada.',403);try{const r=await api(req,env,ctx),h=new Headers(r.headers);for(const[k,v]of Object.entries(cors))h.set(k,v);h.set('x-content-type-options','nosniff');return new Response(r.body,{status:r.status,headers:h})}catch(e){console.error('Aquipay API',e);return err(e.message==='too_large'?'Pedido demasiado grande.':e instanceof SyntaxError?'JSON inválido.':'Erro interno. Tenta novamente.',e.message==='too_large'?413:500)}},async scheduled(controller,env){await purgeExpiredAccounts(env)}};
