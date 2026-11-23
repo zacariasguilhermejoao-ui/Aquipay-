@@ -11,6 +11,13 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "aquipay-db", "database_id": "3c9f4023-87eb-4fbe-885b-d25760974c71" }
   ],
+  "send_email": [{ "name": "EMAIL" }],
+  "vars": {
+    "APP_ORIGIN": "https://aquipay.isabstudio.dev",
+    "EXTRA_ORIGINS": "https://ancient-star-9c8c.osamariches.workers.dev",
+    "MAIL_FROM": "no-reply@isabstudio.dev",
+    "VAPID_PUBLIC_KEY": "BH-wW8rBNSru4t4iAiHetwaqYhLpaq59JitYbwYEpYzk9bc4W9vy25QxwFCn5bjlQ12PaO15ufvQS7ivcU_4D6g"
+  },
   "r2_buckets": [
     { "binding": "MEDIA", "bucket_name": "aquipay-blobs" }
   ]
