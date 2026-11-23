@@ -49,7 +49,7 @@ export async function handleGooglePlayBilling(req,env,me){
     ]);
     credited=!!result?.[0]?.meta?.changes;
    }catch{
-    const check=await env.DB.prepare("SELECT user_id FROM google_play_purchases WHERE purchase_token=?").bind(tokenHash).first();
+    const check=await env.DB.prepare("SELECT user_id FROM google_play_purchases WHERE purchase_token_hash=?").bind(tokenHash).first();
     if(!check)return response({error:"A compra foi validada, mas não foi possível creditar as moedas. Tenta novamente."},503);
    }
   }
@@ -67,7 +67,7 @@ export async function handleGooglePlayBilling(req,env,me){
  if(existing&&(existing.user_id!==me.id||existing.product_id!==plusProduct))return response({error:"Esta assinatura já está associada a outra conta."},409);
  if(!existing){
   try{await env.DB.prepare("INSERT INTO google_play_purchases(id,user_id,product_id,product_type,purchase_token_hash,order_id,purchase_state,coins_granted,expiry_time_ms,acknowledged,verification_json) VALUES(?,?,?,'subs',?,?,'purchased',0,?,0,?)").bind(crypto.randomUUID(),me.id,plusProduct,tokenHash,sub.latestOrderId||null,Date.parse(expiresAt),JSON.stringify(sub)).run()}catch{
-   const check=await env.DB.prepare("SELECT user_id FROM google_play_purchases WHERE purchase_token=?").bind(tokenHash).first();if(check?.user_id!==me.id)return response({error:"Esta assinatura já está associada a outra conta."},409);
+   const check=await env.DB.prepare("SELECT user_id FROM google_play_purchases WHERE purchase_token_hash=?").bind(tokenHash).first();if(check?.user_id!==me.id)return response({error:"Esta assinatura já está associada a outra conta."},409);
   }
  }
  await env.DB.prepare("INSERT INTO user_subscriptions(user_id,product_id,status,expires_at,updated_at) VALUES(?,?,'active',?,?) ON CONFLICT(user_id) DO UPDATE SET product_id=excluded.product_id,status='active',expires_at=MAX(user_subscriptions.expires_at,excluded.expires_at),updated_at=excluded.updated_at").bind(me.id,plusProduct,expiresAt,now).run();
