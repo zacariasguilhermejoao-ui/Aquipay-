@@ -104,7 +104,7 @@ jobs:
               }
 
               @Override
-              public void IHaveModifiedTheMainActivityForSocialLoginPlugin() {}
+              public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {}
 
               @Override
               protected void onNewIntent(Intent intent) {
