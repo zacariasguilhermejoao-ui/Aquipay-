@@ -224,7 +224,7 @@ jobs:
           }
           """
           if "signingConfigs" not in source:
-              gradle.write_text(source + "\\n" + signing)
+              gradle.write_text(source + "\n" + signing)
           print("Release signing configured; private key remains in runner workspace.")
           PY
 
