@@ -260,6 +260,17 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
+// Correspondência de contactos: os números recebidos são usados apenas em memória e nunca são guardados.
+if(p==='/api/contacts/match'&&m==='POST'){
+ const rl=await limited(req,env,'contacts_match',8,3600);if(rl)return rl;
+ const b=await json(req,120000),contacts=Array.isArray(b.contacts)?b.contacts.slice(0,500):[];
+ if(!contacts.length)return out({users:[]});
+ const normalizePhone=value=>{let n=String(value||'').replace(/[^0-9]/g,'');if(n.startsWith('00'))n=n.slice(2);if(n.length===9)n='244'+n;else if(n.length===10&&n.startsWith('0'))n='244'+n.slice(1);return n.length>=9&&n.length<=15?n:''};
+ const wanted=new Map();for(const c of contacts){const phone=normalizePhone(c?.phone);if(phone&&!wanted.has(phone))wanted.set(phone,clean(c?.name,100))}
+ const rows=await env.DB.prepare("SELECT u.id,u.name,p.phone,p.city,p.professions_json,CASE WHEN p.avatar_key IS NOT NULL THEN '/api/avatars/'||u.id ELSE NULL END avatar_url,(SELECT COUNT(*) FROM user_follows f WHERE f.followed_id=u.id) followers_count,EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_id=? AND f.followed_id=u.id) is_following FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.status='active' AND u.deletion_requested_at IS NULL AND p.public_profile=1 AND p.phone IS NOT NULL AND u.id<>? AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id=?) AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id=?)").bind(me.id,me.id,me.id,me.id).all();
+ const matched=[];const seen=new Set();for(const row of rows.results||[]){const phone=normalizePhone(row.phone);if(phone&&wanted.has(phone)&&!seen.has(row.id)){seen.add(row.id);matched.push({...row,matched_contact_name:wanted.get(phone)})}}
+ matched.sort((a,b)=>Number(b.is_following)-Number(a.is_following)||a.name.localeCompare(b.name));return out({users:matched.slice(0,100),checked:contacts.length});
+}
 // Rede profissional: diretório público, seguidores e perfis seguidos.
 if(p==='/api/network'&&m==='GET'){
  const q=clean(u.searchParams.get('q'),80),profession=clean(u.searchParams.get('profession'),80);
