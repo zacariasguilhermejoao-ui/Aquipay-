@@ -274,7 +274,7 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   const target=new URL('https://call-room/websocket');
   target.searchParams.set('userId',row.user_id);
   target.searchParams.set('roomType',row.call_id?'call':'user');
-  return room.fetch(new Request(target,{headers:{Upgrade:'websocket'}}));
+  return room.fetch(new Request(target,req));
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
