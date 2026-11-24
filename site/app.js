@@ -190,6 +190,86 @@ const profilePublic=u=>u.publicProfile!==false;
 
 /* ações */
 const A={
+
+async connectCallPresence(){
+ if(!S.me?.apiToken||(callRealtimeSocket&&callRealtimeSocket.readyState<2))return;
+ try{
+  const d=await api('/api/calls/realtime-ticket',{method:'POST'});
+  const url=CFG.apiBase.replace(/^https:/,'wss:').replace(/^http:/,'ws:')+'/api/calls/ws?ticket='+encodeURIComponent(d.ticket);
+  const ws=new WebSocket(url);callRealtimeSocket=ws;
+  ws.onmessage=e=>{let data;try{data=JSON.parse(e.data)}catch{return}if(data.type==='incoming-call')A.incomingCall(data)};
+  ws.onclose=()=>{if(callRealtimeSocket===ws)callRealtimeSocket=null};
+ }catch(e){console.warn('Call presence',e)}
+},
+async openIncomingCall(id){
+ if(!S.me?.apiToken||!id)return;
+ try{
+  const d=await api('/api/calls/'+encodeURIComponent(id)),call=d.call;
+  if(call?.callee_id===S.me.cloudId&&call.status==='ringing')A.incomingCall({callId:id,callType:call.call_type,callerId:call.caller_id,callerName:call.otherName,conversationId:call.conversation_id});
+ }catch(e){toast(e.message||'Esta chamada já não está disponível.')}
+},
+incomingCall(data){
+ if(activeCall?.id===data.callId)return;
+ if(activeCall){toast('Já estás numa chamada.');return}
+ activeCall={id:data.callId,type:data.callType==='video'?'video':'voice',role:'callee',conversationId:data.conversationId,otherName:data.callerName||'Utilizador',pc:null,ws:null,local:null,remote:null};
+ A.callUi('incoming');
+},
+callUi(state){
+ const v=activeCall?.type==='video',name=esc(activeCall?.otherName||'Utilizador');
+ const title=state==='incoming'?'<p class="mut">Chamada recebida</p>':'<p class="mut">'+(state==='calling'?'A chamar…':'Em chamada')+'</p>';
+ const video=v?'<div class="call-video-stage"><video id="callRemote" autoplay playsinline></video><video id="callLocal" autoplay muted playsinline></video></div>':'<div class="call-avatar">'+ic('phone')+'</div>';
+ const actions=state==='incoming'?'<div class="call-actions"><button class="btn secondary danger-outline" data-a="declineCall">'+ic('x')+' Recusar</button><button class="btn" data-a="acceptCall">'+ic('phone')+' Atender</button></div>':'<button class="btn danger-solid" data-a="endCall">'+ic('phone')+(state==='calling'?' Cancelar chamada':' Terminar chamada')+'</button>';
+ sheet('<div class="call-panel">'+video+title+'<h2>'+name+'</h2>'+actions+'</div>');
+},
+async startCall(el){
+ if(!S.activeChat?.id)return toast('Abre primeiro uma conversa.');
+ if(activeCall)return toast('Já existe uma chamada em curso.');
+ const type=el.dataset.type==='video'?'video':'voice';
+ try{
+  const d=await api('/api/calls',{method:'POST',body:JSON.stringify({conversationId:S.activeChat.id,type})});
+  activeCall={id:d.callId,type,role:'caller',conversationId:S.activeChat.id,otherName:d.calleeName||S.activeChat.name||'Utilizador',pc:null,ws:null,local:null,remote:null};
+  A.callUi('calling');await A.connectCall(d.callId,type,true);
+ }catch(e){A.closeCall();toast(e.message||'Não foi possível iniciar a chamada.')}
+},
+async acceptCall(){
+ if(!activeCall)return;
+ try{await api('/api/calls/'+encodeURIComponent(activeCall.id)+'/answer',{method:'POST'});A.callUi('calling');await A.connectCall(activeCall.id,activeCall.type,false)}
+ catch(e){A.closeCall();toast(e.message||'Não foi possível atender a chamada.')}
+},
+async connectCall(id,type,initiator){
+ const ticket=await api('/api/calls/'+encodeURIComponent(id)+'/ticket',{method:'POST'});
+ const url=CFG.apiBase.replace(/^https:/,'wss:').replace(/^http:/,'ws:')+'/api/calls/ws?ticket='+encodeURIComponent(ticket.ticket);
+ const ws=new WebSocket(url);activeCall.ws=ws;
+ await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('A ligação em tempo real demorou demasiado.')),12000);ws.onopen=()=>{clearTimeout(timeout);resolve()};ws.onerror=()=>{clearTimeout(timeout);reject(new Error('Não foi possível ligar ao serviço de chamadas.'))}});
+ const ice=await api('/api/calls/ice');
+ const local=await navigator.mediaDevices.getUserMedia({audio:true,video:type==='video'});
+ const pc=new RTCPeerConnection({iceServers:ice.iceServers||[]});
+ activeCall.local=local;activeCall.pc=pc;
+ local.getTracks().forEach(track=>pc.addTrack(track,local));
+ pc.ontrack=e=>{const remote=$('callRemote');if(remote&&e.streams?.[0])remote.srcObject=e.streams[0]};
+ pc.onconnectionstatechange=()=>{if(['failed','disconnected'].includes(pc.connectionState))toast('A ligação perdeu estabilidade. Verifica a internet.')};
+ const waitIce=()=>new Promise(resolve=>{if(pc.iceGatheringState==='complete')return resolve();const done=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',done);resolve()}};pc.addEventListener('icegatheringstatechange',done);setTimeout(resolve,9000)});
+ ws.onmessage=async e=>{
+  let msg;try{msg=JSON.parse(e.data)}catch{return}
+  if(msg.type==='call-ended'||msg.type==='hangup'){A.closeCall();toast('A chamada terminou.');return}
+  try{
+   if(msg.type==='offer'&& !initiator){await pc.setRemoteDescription(msg.payload);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await waitIce();ws.send(JSON.stringify({type:'answer',payload:pc.localDescription}))}
+   else if(msg.type==='answer'&&initiator){await pc.setRemoteDescription(msg.payload)}
+  }catch(err){console.warn('WebRTC signaling',err)}
+ };
+ if(initiator){const offer=await pc.createOffer();await pc.setLocalDescription(offer);await waitIce();ws.send(JSON.stringify({type:'offer',payload:pc.localDescription}))}
+ A.callUi('active');const localVideo=$('callLocal');if(localVideo)localVideo.srcObject=local;
+},
+async declineCall(){
+ if(!activeCall)return;try{await api('/api/calls/'+encodeURIComponent(activeCall.id)+'/decline',{method:'POST'})}catch{}A.closeCall();
+},
+async endCall(){
+ if(!activeCall)return;try{activeCall.ws?.send(JSON.stringify({type:'hangup'}));await api('/api/calls/'+encodeURIComponent(activeCall.id)+'/end',{method:'POST'})}catch{}A.closeCall();
+},
+closeCall(){
+ if(activeCall){try{activeCall.local?.getTracks().forEach(t=>t.stop());activeCall.pc?.close();activeCall.ws?.close()}catch{}}
+ activeCall=null;closeSheet();
+},
 async openIdentity(){try{S.identityStatus=await api('/api/identity/status');if(S.me){S.me.identityVerified=!!S.identityStatus.verified;const safe={...S.me};delete safe.apiToken;await saveUser(safe)}go('identity')}catch(e){toast(e.message)}},
 async refreshIdentity(){try{S.identityStatus=await api('/api/identity/status');if(S.me){S.me.identityVerified=!!S.identityStatus.verified;const safe={...S.me};delete safe.apiToken;await saveUser(safe)}render()}catch(e){toast(e.message)}},
 async startIdentity(){const consent=$('identityConsent')?.checked===true;if(!consent){toast('Aceita o consentimento antes de continuar.');return}try{const d=await api('/api/identity/start',{method:'POST',body:JSON.stringify({consent:true})});if(!d.url)throw new Error('A Didit não devolveu o link de verificação.');window.location.assign(d.url)}catch(e){toast(e.message)}},
