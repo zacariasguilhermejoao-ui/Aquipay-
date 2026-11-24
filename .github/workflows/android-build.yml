@@ -404,12 +404,10 @@ jobs:
           if not variables.is_file() or not app_gradle.is_file() or not root_gradle.is_file():
               raise SystemExit("Expected generated Capacitor Android Gradle files were not found.")
 
-          # Capacitor's generated variables.gradle is the source of SDK values
-          # consumed by app/build.gradle. Require each setting to exist exactly once.
           source = variables.read_text(encoding="utf-8")
           for key, value in (("minSdkVersion", 24), ("compileSdkVersion", 36), ("targetSdkVersion", 36)):
-              pattern = rf"(?m)^(\\s*{key}\\s*=\\s*)\\d+(\\s*(?://.*)?)$"
-              source, count = re.subn(pattern, rf"\\g<1>{value}\\g<2>", source)
+              pattern = rf"(?m)^(\s*{key}\s*=\s*)\d+(\s*(?://.*)?)$"
+              source, count = re.subn(pattern, rf"\g<1>{value}\g<2>", source)
               if count != 1:
                   raise SystemExit(f"Expected exactly one {key} assignment in android/variables.gradle; found {count}.")
           variables.write_text(source, encoding="utf-8")
@@ -417,7 +415,7 @@ jobs:
           # Android Gradle Plugin 8.9.1 supports API 36; Gradle 8.11.1 is its minimum.
           root_source = root_gradle.read_text(encoding="utf-8")
           root_source, agp_count = re.subn(
-              r"com\\.android\\.tools\\.build:gradle:[0-9.]+",
+              r"com\.android\.tools\.build:gradle:[0-9.]+",
               "com.android.tools.build:gradle:8.9.1",
               root_source,
               count=1,
@@ -429,8 +427,8 @@ jobs:
           if wrapper.is_file():
               wrapper_source = wrapper.read_text(encoding="utf-8")
               wrapper_source, wrapper_count = re.subn(
-                  r"(?m)^distributionUrl=.*gradle-[0-9.]+-(?:all|bin)\\.zip$",
-                  "distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip",
+                  r"(?m)^distributionUrl=.*gradle-[0-9.]+-(?:all|bin)\.zip$",
+                  "distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-bin.zip",
                   wrapper_source,
                   count=1,
               )
