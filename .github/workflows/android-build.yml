@@ -389,6 +389,42 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
+      - name: Set minimum Android SDK to 24
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          changed = []
+          for path in Path("android").rglob("*.gradle*"):
+              source = path.read_text(encoding="utf-8")
+              updated, count = re.subn(
+                  r"(?m)^(\\s*minSdkVersion\\s*=\\s*)23(\\s*(?://.*)?)$",
+                  r"\\g<1>24\\g<2>",
+                  source,
+              )
+              updated2, count2 = re.subn(
+                  r"(?m)^(\\s*minSdk\\s*=\\s*)23(\\s*(?://.*)?)$",
+                  r"\\g<1>24\\g<2>",
+                  updated,
+              )
+              if count or count2:
+                  path.write_text(updated2, encoding="utf-8")
+                  changed.append(str(path))
+
+          if not changed:
+              raise SystemExit("Could not find a generated Gradle minSdkVersion/minSdk set to 23.")
+          print("Updated minimum SDK to 24 in: " + ", ".join(changed))
+
+          remaining = []
+          for path in Path("android").rglob("*.gradle*"):
+              source = path.read_text(encoding="utf-8")
+              if re.search(r"(?m)^\\s*minSdk(?:Version)?\\s*=\\s*23\\b", source):
+                  remaining.append(str(path))
+          if remaining:
+              raise SystemExit("A Gradle file still sets minSdk to 23: " + ", ".join(remaining))
+          PY
+
       - name: Resolve AndroidX Browser dependency conflict
         run: |
           python - <<'PY'
