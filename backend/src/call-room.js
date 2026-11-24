@@ -22,6 +22,12 @@ export class CallRoom extends DurableObject {
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ userId, roomType });
+    if (roomType === 'call') {
+      const latestOffer = await this.ctx.storage.get('latest-offer');
+      if (latestOffer && latestOffer.from !== userId) {
+        try { server.send(JSON.stringify(latestOffer)); } catch {}
+      }
+    }
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -31,7 +37,9 @@ export class CallRoom extends DurableObject {
     let data;
     try { data = JSON.parse(message); } catch { return; }
     if (!["offer", "answer", "candidate", "hangup"].includes(data.type)) return;
-    const safe = JSON.stringify({ type: data.type, payload: data.payload ?? null, from: state.userId });
+    const packet = { type: data.type, payload: data.payload ?? null, from: state.userId };
+    if (data.type === 'offer') await this.ctx.storage.put('latest-offer', packet);
+    const safe = JSON.stringify(packet);
     for (const peer of this.ctx.getWebSockets()) {
       const other = peer.deserializeAttachment();
       if (peer !== ws && peer.readyState === WebSocket.OPEN && other?.userId !== state.userId) {
