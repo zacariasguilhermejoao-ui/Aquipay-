@@ -89,6 +89,36 @@ const DOCS = {
     ]
   },
 
+  faqs: {
+    icon: 'help', title: 'Perguntas Frequentes',
+    intro: 'Encontra respostas rápidas às dúvidas mais comuns sobre o AquiPay.',
+    sections: [
+      ['Conta e perfil', [
+        ['Como crio uma conta no AquiPay?', 'Abre o AquiPay, escolhe Criar conta e preenche o teu nome, email e palavra-passe. Também podes continuar com Google.'],
+        ['Posso usar o AquiPay sem completar o perfil?', 'Podes explorar a plataforma, mas recomendamos preencher cidade, profissão, competências e experiência para transmitires confiança.'],
+        ['Como altero os meus dados?', 'Abre Perfil, atualiza os campos que pretendes e toca em Guardar perfil.'],
+        ['Como elimino a minha conta?', 'Vai a Definições e escolhe Pedir eliminação da conta. Também podes usar a página pública de eliminação de conta.']
+      ]],
+      ['Anúncios e candidaturas', [
+        ['Como publico um anúncio?', 'No ecrã inicial, toca no botão de adicionar, preenche os dados do trabalho ou serviço, adiciona fotografias se necessário e publica.'],
+        ['Como me candidato a uma oportunidade?', 'Abre o anúncio, consulta o perfil de quem publicou e toca em Apresentar proposta para enviar a tua mensagem.'],
+        ['Quantas candidaturas gratuitas tenho?', 'O plano Free inclui até 5 candidaturas por dia. Candidaturas adicionais podem usar moedas; o Plus oferece candidaturas ilimitadas enquanto estiver ativo.'],
+        ['O AquiPay garante que vou receber pelo trabalho?', 'Não. O pagamento é combinado diretamente entre as pessoas. Consulta o perfil, combina as condições por escrito e usa as ferramentas de denúncia se necessário.']
+      ]],
+      ['Moedas e plano Plus', [
+        ['Para que servem as moedas?', 'As moedas são utilizadas em funcionalidades pagas do AquiPay, como candidaturas adicionais quando ultrapassas o limite gratuito.'],
+        ['Como compro moedas?', 'Na aplicação Android, abre Moedas e plano, escolhe um pacote e conclui a compra através da Google Play.'],
+        ['Como funciona o plano Plus?', 'O Plus é uma subscrição mensal que dá acesso às vantagens apresentadas na aplicação enquanto estiver ativa. Podes gerir ou cancelar a renovação na Google Play.'],
+        ['Como peço ajuda com uma compra?', 'Contacta contas@isabstudio.dev e indica o email da conta, a data, o produto e a referência da compra. Nunca envies palavras-passe ou códigos de autenticação.']
+      ]],
+      ['Segurança e apoio', [
+        ['O que significa o selo de verificado?', 'Significa que a conta passou pelo processo de verificação do AquiPay. Não é uma garantia de pagamento ou de qualidade do trabalho.'],
+        ['Como denuncio um perfil ou anúncio?', 'Usa a opção Denunciar disponível no perfil ou no menu do anúncio. Para situações urgentes, escreve para denuncia@isabstudio.dev.'],
+        ['Como contacto o apoio?', 'Para dificuldades técnicas ou questões sobre a conta, escreve para suporte@isabstudio.dev. Para privacidade, utiliza privacidade@isabstudio.dev.']
+      ]]
+    ]
+  },
+
   ajuda: {
     icon: 'help', title: 'Ajuda e Contacto',
     intro: 'Respostas às dúvidas mais comuns e como falar connosco.',
@@ -121,7 +151,7 @@ const DOCS = {
 const DOC_ORDER = [
   ['Legal', ['termos', 'privacidade', 'reembolso', 'cookies']],
   ['Comunidade e segurança', ['conduta', 'seguranca']],
-  ['Apoio', ['ajuda', 'sobre']]
+  ['Apoio', ['faqs', 'ajuda', 'sobre']]
 ];
 
 function docHtml(id) {
