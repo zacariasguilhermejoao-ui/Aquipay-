@@ -218,7 +218,7 @@ incomingCall(data){
 callUi(state){
  const v=activeCall?.type==='video',name=esc(activeCall?.otherName||'Utilizador');
  const title=state==='incoming'?'<p class="mut">Chamada recebida</p>':'<p class="mut">'+(state==='calling'?'A chamar…':'Em chamada')+'</p>';
- const video=v?'<div class="call-video-stage"><video id="callRemote" autoplay playsinline></video><video id="callLocal" autoplay muted playsinline></video></div>':'<div class="call-avatar">'+ic('phone')+'</div>';
+ const video=v?'<div class="call-video-stage"><video id="callRemote" autoplay playsinline></video><video id="callLocal" autoplay muted playsinline></video></div>':'<audio id="callAudio" autoplay playsinline></audio><div class="call-avatar">'+ic('phone')+'</div>';
  const actions=state==='incoming'?'<div class="call-actions"><button class="btn secondary danger-outline" data-a="declineCall">'+ic('x')+' Recusar</button><button class="btn" data-a="acceptCall">'+ic('phone')+' Atender</button></div>':'<button class="btn danger-solid" data-a="endCall">'+ic('phone')+(state==='calling'?' Cancelar chamada':' Terminar chamada')+'</button>';
  sheet('<div class="call-panel">'+video+title+'<h2>'+name+'</h2>'+actions+'</div>');
 },
@@ -247,7 +247,7 @@ async connectCall(id,type,initiator){
  const pc=new RTCPeerConnection({iceServers:ice.iceServers||[]});
  activeCall.local=local;activeCall.pc=pc;
  local.getTracks().forEach(track=>pc.addTrack(track,local));
- pc.ontrack=e=>{if(activeCall)activeCall.remote=e.streams?.[0]||null;const remote=$('callRemote');if(remote&&activeCall?.remote)remote.srcObject=activeCall.remote};
+ pc.ontrack=e=>{if(activeCall)activeCall.remote=e.streams?.[0]||null;const remote=$('callRemote'),audio=$('callAudio');if(remote&&activeCall?.remote)remote.srcObject=activeCall.remote;if(audio&&activeCall?.remote)audio.srcObject=activeCall.remote};
  pc.onconnectionstatechange=()=>{if(['failed','disconnected'].includes(pc.connectionState))toast('A ligação perdeu estabilidade. Verifica a internet.')};
  const waitIce=()=>new Promise(resolve=>{if(pc.iceGatheringState==='complete')return resolve();const done=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',done);resolve()}};pc.addEventListener('icegatheringstatechange',done);setTimeout(resolve,9000)});
  signalHandler=async raw=>{
