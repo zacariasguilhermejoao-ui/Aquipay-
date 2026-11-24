@@ -1,4 +1,5 @@
 import { handleGooglePlayBilling } from "./google-play-billing.js";
+export { CallRoom } from "./call-room.js";
 const H={"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","x-frame-options":"DENY","referrer-policy":"strict-origin-when-cross-origin","strict-transport-security":"max-age=63072000; includeSubDomains; preload"};
 const enc=new TextEncoder();
 const out=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...H,...extra}});
@@ -26,7 +27,7 @@ async function issueLoginChallenge(userId,env){const id=b64(crypto.getRandomValu
 function angolaPeriodStart(period){const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Luanda',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(x=>[x.type,x.value]));const date=period==='month'?`${parts.year}-${parts.month}-01`:`${parts.year}-${parts.month}-${parts.day}`;return new Date(`${date}T00:00:00+01:00`).toISOString()}
 async function plusIsActive(env,userId){const r=await env.DB.prepare("SELECT 1 active FROM user_subscriptions WHERE user_id=? AND status='active' AND expires_at>? LIMIT 1").bind(userId,new Date().toISOString()).first();return !!r}
 async function current(req,env){const h=req.headers.get('authorization')||'',t=h.startsWith('Bearer ')?h.slice(7):'';if(!t)return null;return env.DB.prepare("SELECT u.id,u.name,u.email,u.deletion_requested_at,u.deletion_due_at,u.onboarding_completed_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.status='active'").bind(await digest(t),new Date().toISOString()).first()}
-async function notice(env,userId,kind,title,body,data={}){const active=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(userId).first();if(!active)return;await env.DB.prepare('INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)').bind(uid(),userId,kind,title.slice(0,100),body.slice(0,500),JSON.stringify(data)).run();await pushTo(env,userId,kind,title,body)}
+async function notice(env,userId,kind,title,body,data={}){const active=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(userId).first();if(!active)return;await env.DB.prepare('INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)').bind(uid(),userId,kind,title.slice(0,100),body.slice(0,500),JSON.stringify(data)).run();await pushTo(env,userId,kind,title,body,data)}
 async function limited(req,env,name,max,sec){
   const ip=req.headers.get('cf-connecting-ip')||'unknown',now=Date.now(),k=name+':'+ip+':'+Math.floor(now/(sec*1000));
   const r=await env.DB.prepare('INSERT INTO rate_limits(k,n,exp) VALUES(?,1,?) ON CONFLICT(k) DO UPDATE SET n=n+1 RETURNING n').bind(k,now+sec*2000).first();
@@ -68,7 +69,7 @@ async function googleAuth(req,env){
   return out({user:{id:u.id,name:u.name,email:u.email,deletionRequestedAt:u.deletion_requested_at||null,deletionDueAt:u.deletion_due_at||null},...await session(u.id,env)},created?201:200);
 }
 const PUSH_HOSTS=['googleapis.com','mozilla.com','push.apple.com','windows.com','samsung.com'];
-const PUSH_PREF={proposal:'candidaturas',proposal_status:'candidaturas',rating:'candidaturas',message:'mensagens',post:'novidades'};
+const PUSH_PREF={proposal:'candidaturas',proposal_status:'candidaturas',rating:'candidaturas',message:'mensagens',call:'mensagens',post:'novidades'};
 const Z=new Uint8Array([0]);
 const cat=(...a)=>{const o=new Uint8Array(a.reduce((t,x)=>t+x.length,0));let i=0;for(const x of a){o.set(x,i);i+=x.length}return o};
 async function hkdf(salt,ikm,info,len){const k=await crypto.subtle.importKey('raw',ikm,'HKDF',false,['deriveBits']);return new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt,info},k,len*8))}
@@ -127,7 +128,7 @@ async function sendFcm(env,account,token,payload){
   const access=await firebaseAccessToken(account);
   return fetch('https://fcm.googleapis.com/v1/projects/'+encodeURIComponent(account.project_id)+'/messages:send',{
     method:'POST',headers:{authorization:'Bearer '+access,'content-type':'application/json'},
-    body:JSON.stringify({message:{token,notification:{title:payload.title,body:payload.body},data:{url:String(payload.url||'/'),kind:String(payload.kind||'novidades')},android:{priority:'HIGH',notification:{channel_id:'default',sound:'default'}}}}),
+    body:JSON.stringify({message:{token,notification:{title:payload.title,body:payload.body},data:{url:String(payload.url||'/'),kind:String(payload.kind||'novidades'),callId:String(payload.callId||''),callType:String(payload.callType||'')},android:{priority:'HIGH',notification:{channel_id:'default',sound:'default'}}}}),
     signal:AbortSignal.timeout(8000)
   });
 }
@@ -139,8 +140,8 @@ async function registerFcmToken(req,env,me){
   await env.DB.prepare('DELETE FROM fcm_tokens WHERE user_id=? AND token NOT IN (SELECT token FROM fcm_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 5)').bind(me.id,me.id).run();
   return out({ok:true},201);
 }
-async function pushTo(env,userId,kind,title,body){
-  const pref=PUSH_PREF[kind]||'novidades',payload={title:title.slice(0,80),body:body.slice(0,200),url:'/',kind};
+async function pushTo(env,userId,kind,title,body,data={}){
+  const pref=PUSH_PREF[kind]||'novidades',payload={title:title.slice(0,80),body:body.slice(0,200),url:String(data.url||'/'),kind,callId:String(data.callId||''),callType:String(data.callType||'')};
   const jobs=[];
   if(env.VAPID_PRIVATE_KEY&&env.VAPID_PUBLIC_KEY){
     jobs.push((async()=>{
@@ -259,9 +260,73 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   if(status==='Approved')await env.DB.prepare('UPDATE users SET identity_verified_at=COALESCE(identity_verified_at,?) WHERE id=?').bind(now,row.user_id).run();
   return out({ok:true});
  }
+ const wsPath=p==='/api/calls/ws'&&m==='GET';
+ if(wsPath){
+  if(req.headers.get('Upgrade')!=='websocket')return err('WebSocket necessário.',426);
+  const ticket=clean(u.searchParams.get('ticket'),160);
+  if(!ticket)return err('Bilhete inválido.',401);
+  const hash=await digest(ticket);
+  const row=await env.DB.prepare('SELECT t.user_id,t.call_id,c.caller_id,c.callee_id,c.status FROM call_tickets t LEFT JOIN calls c ON c.id=t.call_id WHERE t.token_hash=? AND t.expires_at>?').bind(hash,new Date().toISOString()).first();
+  if(!row)return err('Bilhete expirado ou já utilizado.',401);
+  await env.DB.prepare('DELETE FROM call_tickets WHERE token_hash=?').bind(hash).run();
+  if(row.call_id&&(![row.caller_id,row.callee_id].includes(row.user_id)||!['ringing','active'].includes(row.status)))return err('Chamada indisponível.',403);
+  const room=env.CALL_ROOMS.getByName(row.call_id||'user:'+row.user_id);
+  const target=new URL('https://call-room/websocket');
+  target.searchParams.set('userId',row.user_id);
+  target.searchParams.set('roomType',row.call_id?'call':'user');
+  return room.fetch(new Request(target,{headers:{Upgrade:'websocket'}}));
+ }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
 if(p==='/api/billing/google/verify'&&m==='POST')return handleGooglePlayBilling(req,env,me);
+
+ if(p==='/api/calls/realtime-ticket'&&m==='POST'){
+  const ticket=b64(crypto.getRandomValues(new Uint8Array(32)));
+  await env.DB.prepare('INSERT INTO call_tickets(token_hash,user_id,call_id,expires_at) VALUES(?,?,NULL,?)').bind(await digest(ticket),me.id,new Date(Date.now()+60000).toISOString()).run();
+  return out({ticket,expiresIn:60},201);
+ }
+ if(p==='/api/calls'&&m==='POST'){
+  const b=await json(req,3000),conversationId=clean(b.conversationId,80),type=b.type==='video'?'video':'voice';
+  const c=await env.DB.prepare('SELECT id,participant_a,participant_b FROM conversations WHERE id=? AND (participant_a=? OR participant_b=?)').bind(conversationId,me.id,me.id).first();
+  if(!c)return err('Conversa não encontrada.',404);
+  const calleeId=c.participant_a===me.id?c.participant_b:c.participant_a;
+  const callee=await env.DB.prepare("SELECT id,name FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(calleeId).first();
+  if(!callee)return err('Este utilizador não está disponível.',404);
+  const id=uid(),now=new Date().toISOString();
+  await env.DB.prepare("INSERT INTO calls(id,conversation_id,caller_id,callee_id,call_type,status,created_at) VALUES(?,?,?,?,?,'ringing',?)").bind(id,conversationId,me.id,calleeId,type,now).run();
+  const data={callId:id,callType:type,conversationId,url:'/?call='+encodeURIComponent(id)};
+  await notice(env,calleeId,'call',type==='video'?'Chamada de vídeo recebida':'Chamada de voz recebida',me.name+' está a ligar-te.',data);
+  try{const room=env.CALL_ROOMS.getByName('user:'+calleeId);await room.fetch(new Request('https://call-room/broadcast',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'incoming-call',callId:id,callType:type,conversationId,callerId:me.id,callerName:me.name})}))}catch(e){console.error('call notify',e)}
+  return out({ok:true,callId:id,callType:type,calleeName:callee.name},201);
+ }
+ const callMatch=p.match(/^\/api\/calls\/([\w-]+)(?:\/(answer|decline|end|ticket))?$/);
+ if(callMatch){
+  const id=callMatch[1],action=callMatch[2]||'';
+  const call=await env.DB.prepare('SELECT id,conversation_id,caller_id,callee_id,call_type,status FROM calls WHERE id=? AND (caller_id=? OR callee_id=?)').bind(id,me.id,me.id).first();
+  if(!call)return err('Chamada não encontrada.',404);
+  if(m==='GET'&&!action){const other=await env.DB.prepare('SELECT name FROM users WHERE id=?').bind(call.caller_id===me.id?call.callee_id:call.caller_id).first();return out({call:{...call,otherName:other?.name||'Utilizador'}})}
+  if(m==='POST'&&action==='ticket'){
+   if(!['ringing','active'].includes(call.status))return err('Esta chamada já terminou.',409);
+   const ticket=b64(crypto.getRandomValues(new Uint8Array(32)));
+   await env.DB.prepare('INSERT INTO call_tickets(token_hash,user_id,call_id,expires_at) VALUES(?,?,?,?)').bind(await digest(ticket),me.id,id,new Date(Date.now()+60000).toISOString()).run();
+   return out({ticket,expiresIn:60},201);
+  }
+  if(m==='POST'&&action==='answer'){
+   if(me.id!==call.callee_id||call.status!=='ringing')return err('Esta chamada já não pode ser atendida.',409);
+   await env.DB.prepare("UPDATE calls SET status='active',answered_at=? WHERE id=? AND status='ringing'").bind(new Date().toISOString(),id).run();
+   await notice(env,call.caller_id,'call','Chamada atendida','A tua chamada foi atendida.',{callId:id,callType:call.call_type,url:'/?call='+id});
+   return out({ok:true,status:'active'});
+  }
+  if(m==='POST'&&(action==='decline'||action==='end')){
+   if(!['ringing','active'].includes(call.status))return out({ok:true,status:call.status});
+   await env.DB.prepare('UPDATE calls SET status=?,ended_at=? WHERE id=?').bind(action==='decline'?'declined':'ended',new Date().toISOString(),id).run();
+   const other=call.caller_id===me.id?call.callee_id:call.caller_id;
+   await notice(env,other,'call',action==='decline'?'Chamada recusada':'Chamada terminada',action==='decline'?'A tua chamada foi recusada.':'A chamada terminou.',{callId:id,callType:call.call_type,url:'/'});
+   try{const room=env.CALL_ROOMS.getByName(id);await room.fetch(new Request('https://call-room/broadcast',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'call-ended',by:me.id})}))}catch{}
+   return out({ok:true,status:action==='decline'?'declined':'ended'});
+  }
+ }
+
 // Correspondência de contactos: os números recebidos são usados apenas em memória e nunca são guardados.
 if(p==='/api/contacts/match'&&m==='POST'){
  const rl=await limited(req,env,'contacts_match',8,3600);if(rl)return rl;
@@ -435,4 +500,4 @@ async function purgeExpiredAccounts(env){
   }catch(e){console.error('account purge failed',id,e)}
  }
 }
-export default {async fetch(req,env,ctx){const origin=req.headers.get('origin'),allowedList=[env.APP_ORIGIN,...String(env.EXTRA_ORIGINS||'').split(',')].map(x=>x.trim()).filter(Boolean),allowed=allowedList.includes(origin)?origin:(env.APP_ORIGIN||''),cors=origin===allowed?{'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','access-control-max-age':'86400','vary':'Origin'}:{};if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});if(origin&&origin!==allowed)return err('Origem não autorizada.',403);try{const r=await api(req,env,ctx),h=new Headers(r.headers);for(const[k,v]of Object.entries(cors))h.set(k,v);h.set('x-content-type-options','nosniff');return new Response(r.body,{status:r.status,headers:h})}catch(e){console.error('Aquipay API',e);return err(e.message==='too_large'?'Pedido demasiado grande.':e instanceof SyntaxError?'JSON inválido.':'Erro interno. Tenta novamente.',e.message==='too_large'?413:500)}},async scheduled(controller,env){await env.DB.prepare('DELETE FROM auth_challenges WHERE expires_at<?').bind(new Date().toISOString()).run();await purgeExpiredAccounts(env)}};
+export default {async fetch(req,env,ctx){const origin=req.headers.get('origin'),allowedList=[env.APP_ORIGIN,...String(env.EXTRA_ORIGINS||'').split(',')].map(x=>x.trim()).filter(Boolean),allowed=allowedList.includes(origin)?origin:(env.APP_ORIGIN||''),cors=origin===allowed?{'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','access-control-max-age':'86400','vary':'Origin'}:{};if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});if(origin&&origin!==allowed)return err('Origem não autorizada.',403);try{const r=await api(req,env,ctx),h=new Headers(r.headers);for(const[k,v]of Object.entries(cors))h.set(k,v);h.set('x-content-type-options','nosniff');return r.webSocket?new Response(null,{status:101,webSocket:r.webSocket,headers:h}):new Response(r.body,{status:r.status,headers:h})}catch(e){console.error('Aquipay API',e);return err(e.message==='too_large'?'Pedido demasiado grande.':e instanceof SyntaxError?'JSON inválido.':'Erro interno. Tenta novamente.',e.message==='too_large'?413:500)}},async scheduled(controller,env){await env.DB.prepare('DELETE FROM auth_challenges WHERE expires_at<?').bind(new Date().toISOString()).run();await purgeExpiredAccounts(env)}};
