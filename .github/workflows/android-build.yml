@@ -51,7 +51,7 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Add Android platform (if missing)
         run: |
@@ -389,40 +389,56 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
-      - name: Set minimum Android SDK to 24
+      - name: Configure Android SDK levels (min 24, target 36)
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
 
-          changed = []
-          for path in Path("android").rglob("*.gradle*"):
-              source = path.read_text(encoding="utf-8")
-              updated, count = re.subn(
-                  r"(?m)^(\s*minSdkVersion\s*=\s*)23(\s*(?://.*)?)$",
-                  r"\g<1>24\g<2>",
-                  source,
-              )
-              updated2, count2 = re.subn(
-                  r"(?m)^(\s*minSdk\s*=\s*)23(\s*(?://.*)?)$",
-                  r"\g<1>24\g<2>",
-                  updated,
-              )
-              if count or count2:
-                  path.write_text(updated2, encoding="utf-8")
-                  changed.append(str(path))
+          root = Path("android")
+          variables = root / "variables.gradle"
+          app_gradle = root / "app/build.gradle"
+          root_gradle = root / "build.gradle"
+          wrapper = root / "gradle/wrapper/gradle-wrapper.properties"
 
-          if not changed:
-              raise SystemExit("Could not find a generated Gradle minSdkVersion/minSdk set to 23.")
-          print("Updated minimum SDK to 24 in: " + ", ".join(changed))
+          if not variables.is_file() or not app_gradle.is_file() or not root_gradle.is_file():
+              raise SystemExit("Expected generated Capacitor Android Gradle files were not found.")
 
-          remaining = []
-          for path in Path("android").rglob("*.gradle*"):
-              source = path.read_text(encoding="utf-8")
-              if re.search(r"(?m)^\s*minSdk(?:Version)?\s*=\s*23\b", source):
-                  remaining.append(str(path))
-          if remaining:
-              raise SystemExit("A Gradle file still sets minSdk to 23: " + ", ".join(remaining))
+          # Capacitor's generated variables.gradle is the source of SDK values
+          # consumed by app/build.gradle. Require each setting to exist exactly once.
+          source = variables.read_text(encoding="utf-8")
+          for key, value in (("minSdkVersion", 24), ("compileSdkVersion", 36), ("targetSdkVersion", 36)):
+              pattern = rf"(?m)^(\\s*{key}\\s*=\\s*)\\d+(\\s*(?://.*)?)$"
+              source, count = re.subn(pattern, rf"\\g<1>{value}\\g<2>", source)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one {key} assignment in android/variables.gradle; found {count}.")
+          variables.write_text(source, encoding="utf-8")
+
+          # Android Gradle Plugin 8.9.1 supports API 36; Gradle 8.11.1 is its minimum.
+          root_source = root_gradle.read_text(encoding="utf-8")
+          root_source, agp_count = re.subn(
+              r"com\\.android\\.tools\\.build:gradle:[0-9.]+",
+              "com.android.tools.build:gradle:8.9.1",
+              root_source,
+              count=1,
+          )
+          if agp_count != 1:
+              raise SystemExit("Could not locate the Android Gradle Plugin dependency to upgrade to 8.9.1.")
+          root_gradle.write_text(root_source, encoding="utf-8")
+
+          if wrapper.is_file():
+              wrapper_source = wrapper.read_text(encoding="utf-8")
+              wrapper_source, wrapper_count = re.subn(
+                  r"(?m)^distributionUrl=.*gradle-[0-9.]+-(?:all|bin)\\.zip$",
+                  "distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip",
+                  wrapper_source,
+                  count=1,
+              )
+              if wrapper_count != 1:
+                  raise SystemExit("Could not update Gradle wrapper to 8.11.1.")
+              wrapper.write_text(wrapper_source, encoding="utf-8")
+
+          print("Configured minSdkVersion=24, compileSdkVersion=36, targetSdkVersion=36, Android Gradle Plugin 8.9.1 and Gradle 8.11.1.")
           PY
 
       - name: Resolve AndroidX Browser dependency conflict
