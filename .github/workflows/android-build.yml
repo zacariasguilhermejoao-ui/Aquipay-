@@ -112,6 +112,15 @@ jobs:
                   super.onNewIntent(intent);
                   setIntent(intent);
                   dispatchSharedIntent(intent);
+                  dispatchAppLink(intent);
+              }
+
+              private void dispatchAppLink(Intent intent) {
+                  if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || getBridge() == null) return;
+                  android.net.Uri uri = intent.getData();
+                  if (uri == null || !"https".equals(uri.getScheme()) || !"aquipay.isabstudio.dev".equals(uri.getHost())) return;
+                  String script = "window.dispatchEvent(new CustomEvent('aquipay:deeplink',{detail:{url:" + org.json.JSONObject.quote(uri.toString()) + "}}));";
+                  getBridge().getWebView().postDelayed(() -> getBridge().getWebView().evaluateJavascript(script, null), 900);
               }
 
               private void dispatchSharedIntent(Intent intent) {
