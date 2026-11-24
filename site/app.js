@@ -265,7 +265,7 @@ async connectCall(id,type,initiator){
  };
  for(const raw of pendingSignals.splice(0))await signalHandler(raw);
  if(initiator){const offer=await pc.createOffer();await pc.setLocalDescription(offer);await waitIce();ws.send(JSON.stringify({type:'offer',payload:pc.localDescription}))}
- A.callUi('active');const localVideo=$('callLocal');if(localVideo)localVideo.srcObject=local;const remoteVideo=$('callRemote');if(remoteVideo&&activeCall.remote)remoteVideo.srcObject=activeCall.remote;
+ A.callUi('active');const localVideo=$('callLocal');if(localVideo)localVideo.srcObject=local;const remoteVideo=$('callRemote'),remoteAudio=$('callAudio');if(remoteVideo&&activeCall.remote)remoteVideo.srcObject=activeCall.remote;if(remoteAudio&&activeCall.remote)remoteAudio.srcObject=activeCall.remote;
 },
 async declineCall(){
  if(!activeCall)return;try{await api('/api/calls/'+encodeURIComponent(activeCall.id)+'/decline',{method:'POST'})}catch{}A.closeCall();
