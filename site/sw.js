@@ -7,9 +7,9 @@ self.addEventListener('fetch',e=>{
 });
 self.addEventListener('push',e=>{
   let d={};try{d=e.data.json()}catch(_){}
-  e.waitUntil(self.registration.showNotification(d.title||'Aquipay',{body:d.body||'',icon:'icon-192.png',badge:'icon-192.png',data:{url:d.url||'./',callId:d.callId||'',callType:d.callType||''}}));
+  e.waitUntil(self.registration.showNotification(d.title||'Aquipay',{body:d.body||'',icon:'icon-192.png',badge:'icon-192.png',data:{url:d.url||'./',callId:d.callId||'',callType:d.callType||'',conversationId:d.conversationId||''}}));
 });
 self.addEventListener('notificationclick',e=>{
   e.notification.close();
-  e.waitUntil(clients.matchAll({type:'window'}).then(async w=>{const data=e.notification.data||{},url=data.callId?('/?call='+encodeURIComponent(data.callId)):(data.url||'./');if(w.length){if(data.callId)await w[0].navigate(url);return w[0].focus()}return clients.openWindow(url)}));
+  e.waitUntil(clients.matchAll({type:'window'}).then(async w=>{const data=e.notification.data||{},url=data.callId?('/?call='+encodeURIComponent(data.callId)):data.conversationId?('/?conversation='+encodeURIComponent(data.conversationId)):(data.url||'./');if(w.length){if(data.callId||data.conversationId)await w[0].navigate(url);return w[0].focus()}return clients.openWindow(url)}));
 });
