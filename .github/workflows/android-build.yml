@@ -91,6 +91,7 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(ShareReceiverPlugin.class);
                   super.onCreate(savedInstanceState);
+                  dispatchAppLink(getIntent());
               }
 
               @Override
@@ -502,7 +503,7 @@ jobs:
           printf 'AQUIPAY_EFFECTIVE_STORE_PASSWORD=%s\n' "$EFFECTIVE_STORE_PASSWORD" >> "$GITHUB_ENV"
 
           echo "Release keystore SHA-1 fingerprint (safe to share with Google Cloud):"
-          keytool -list -v -keystore android/release.keystore -storepass "$EFFECTIVE_STORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep -iE 'SHA1:|SHA-1:'
+          keytool -list -v -keystore android/release.keystore -storepass "$EFFECTIVE_STORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep -iE 'SHA1:|SHA-1:|SHA256:|SHA-256:'
 
           echo "Keystore, store password, alias, and private-key password validated."
 
