@@ -239,7 +239,7 @@ const DICT = [
   ['Moedas e plano', 'Coins and plan', 'Pièces et formule', '金币与套餐'],
   ['Plus ativo até {d}', 'Plus active until {d}', 'Plus actif jusqu’au {d}', 'Plus 有效期至 {d}'],
   ['Plano Plus', 'Plus plan', 'Formule Plus', 'Plus 套餐'],
-  ['Plus · $19.99 / mês', 'Plus · $19.99 / month', 'Plus · 19,99 $ / mois', 'Plus · $19.99 / 月'],
+  ['Plus · $20/mês', 'Plus · $20/month', 'Plus · 20 $/mois', 'Plus · $20/月'],
   ['Candidaturas ilimitadas, sem gastar moedas.', 'Unlimited applications, no coins spent.', 'Candidatures illimitées, sans dépenser de pièces.', '无限次申请，无需消耗金币。'],
   ['Ativar Plus', 'Activate Plus', 'Activer Plus', '开通 Plus'],
   ['Comprar moedas', 'Buy coins', 'Acheter des pièces', '购买金币'],
