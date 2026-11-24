@@ -95,6 +95,18 @@ jobs:
               }
 
               @Override
+              @SuppressWarnings("deprecation")
+              public void onBackPressed() {
+                  if (getBridge() != null && getBridge().getWebView() != null) {
+                      getBridge().getWebView().evaluateJavascript(
+                          "window.dispatchEvent(new Event('aquipay:backbutton'));", null
+                      );
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+
+              @Override
               public void onActivityResult(int requestCode, int resultCode, Intent data) {
                   super.onActivityResult(requestCode, resultCode, data);
                   if (requestCode >= GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MIN && requestCode < GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MAX) {
