@@ -31,6 +31,7 @@ jobs:
           npx --yes esbuild@0.25.0 site/native-push-entry.js --bundle --platform=browser --format=iife --outfile=site/native-push.bundle.js
           npx --yes esbuild@0.25.0 site/native-contacts-entry.js --bundle --platform=browser --format=iife --outfile=site/native-contacts.bundle.js
           npx --yes esbuild@0.25.0 site/native-google-entry.js --bundle --platform=browser --format=iife --outfile=site/native-google.bundle.js
+          npx --yes esbuild@0.25.0 site/native-review-entry.js --bundle --platform=browser --format=iife --outfile=site/native-review.bundle.js
 
       - name: Validate JavaScript syntax
         run: |
@@ -425,7 +426,7 @@ jobs:
           if dependency not in source:
               if "dependencies {" not in source:
                   raise SystemExit("Could not find dependencies block in android/app/build.gradle")
-              source = source.replace("dependencies {", "dependencies {\\n    " + dependency, 1)
+              source = source.replace("dependencies {", "dependencies {\n    " + dependency, 1)
               gradle.write_text(source, encoding="utf-8")
           print("Google Play In-App Review 2.0.2 configured.")
           PY
