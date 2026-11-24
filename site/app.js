@@ -206,7 +206,12 @@ async openIncomingCall(id){
  if(!S.me?.apiToken||!id)return;
  try{
   const d=await api('/api/calls/'+encodeURIComponent(id)),call=d.call;
-  if(call?.callee_id===S.me.cloudId&&call.status==='ringing')A.incomingCall({callId:id,callType:call.call_type,callerId:call.caller_id,callerName:call.otherName,conversationId:call.conversation_id});
+  if(call?.callee_id===S.me.cloudId&&call.status==='ringing'){A.incomingCall({callId:id,callType:call.call_type,callerId:call.caller_id,callerName:call.otherName,conversationId:call.conversation_id});return}
+  if(call?.caller_id===S.me.cloudId&&['ringing','active'].includes(call.status)){
+   if(activeCall?.id===id){A.callUi(activeCall.pc?'active':'calling');return}
+   activeCall={id,type:call.call_type==='video'?'video':'voice',role:'caller',conversationId:call.conversation_id,otherName:call.otherName||'Utilizador',pc:null,ws:null,local:null,remote:null};
+   A.callUi('calling');await A.connectCall(id,activeCall.type,true);
+  }
  }catch(e){toast(e.message||'Esta chamada já não está disponível.')}
 },
 incomingCall(data){
