@@ -8,11 +8,11 @@ import { Capacitor } from '@capacitor/core';
 
 export const PLAY_PRODUCTS = {
   coins: [
-    { id: 'coins_10', coins: 10, bonus: 0 },
-    { id: 'coins_50', coins: 50, bonus: 0 },
-    { id: 'coins_110', coins: 110, bonus: 10 },
-    { id: 'coins_240', coins: 240, bonus: 40 },
-    { id: 'coins_650', coins: 650, bonus: 150 },
+    { id: 'coins_10', coins: 10, bonus: 0, priceUsd: 1 },
+    { id: 'coins_50', coins: 50, bonus: 0, priceUsd: 5 },
+    { id: 'coins_110', coins: 100, bonus: 10, priceUsd: 10 },
+    { id: 'coins_240', coins: 200, bonus: 40, priceUsd: 20 },
+    { id: 'coins_650', coins: 500, bonus: 150, priceUsd: 50 },
   ],
   plus: { id: '', basePlanId: '' },
 };
