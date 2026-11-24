@@ -399,13 +399,13 @@ jobs:
           for path in Path("android").rglob("*.gradle*"):
               source = path.read_text(encoding="utf-8")
               updated, count = re.subn(
-                  r"(?m)^(\\s*minSdkVersion\\s*=\\s*)23(\\s*(?://.*)?)$",
-                  r"\\g<1>24\\g<2>",
+                  r"(?m)^(\s*minSdkVersion\s*=\s*)23(\s*(?://.*)?)$",
+                  r"\g<1>24\g<2>",
                   source,
               )
               updated2, count2 = re.subn(
-                  r"(?m)^(\\s*minSdk\\s*=\\s*)23(\\s*(?://.*)?)$",
-                  r"\\g<1>24\\g<2>",
+                  r"(?m)^(\s*minSdk\s*=\s*)23(\s*(?://.*)?)$",
+                  r"\g<1>24\g<2>",
                   updated,
               )
               if count or count2:
@@ -419,7 +419,7 @@ jobs:
           remaining = []
           for path in Path("android").rglob("*.gradle*"):
               source = path.read_text(encoding="utf-8")
-              if re.search(r"(?m)^\\s*minSdk(?:Version)?\\s*=\\s*23\\b", source):
+              if re.search(r"(?m)^\s*minSdk(?:Version)?\s*=\s*23\b", source):
                   remaining.append(str(path))
           if remaining:
               raise SystemExit("A Gradle file still sets minSdk to 23: " + ", ".join(remaining))
