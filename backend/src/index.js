@@ -278,6 +278,13 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
+if(p==='/api/calls/ice'&&m==='GET'){
+ if(!env.CALL_TURN_KEY_ID||!env.CALL_TURN_KEY_SECRET)return out({iceServers:[{urls:['stun:stun.cloudflare.com:3478']}]});
+ const response=await fetch('https://rtc.live.cloudflare.com/v1/turn/keys/'+encodeURIComponent(env.CALL_TURN_KEY_ID)+'/credentials/generate-ice-servers',{method:'POST',headers:{authorization:'Bearer '+env.CALL_TURN_KEY_SECRET,'content-type':'application/json'},body:JSON.stringify({ttl:3600}),signal:AbortSignal.timeout(8000)});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||!Array.isArray(data.iceServers))return err('Não foi possível preparar a ligação de voz/vídeo.',503);
+ return out({iceServers:data.iceServers});
+}
 if(p==='/api/billing/google/verify'&&m==='POST')return handleGooglePlayBilling(req,env,me);
 
  if(p==='/api/calls/realtime-ticket'&&m==='POST'){
