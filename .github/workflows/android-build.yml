@@ -90,6 +90,7 @@ jobs:
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(ShareReceiverPlugin.class);
+                  registerPlugin(AquiPayReviewPlugin.class);
                   super.onCreate(savedInstanceState);
                   dispatchAppLink(getIntent());
               }
@@ -273,6 +274,31 @@ jobs:
           JAVA
           test -s android/app/src/main/java/com/aquipay/isabstudio/MainActivity.java
           test -s android/app/src/main/java/com/aquipay/isabstudio/ShareReceiverPlugin.java
+          cat > android/app/src/main/java/com/aquipay/isabstudio/AquiPayReviewPlugin.java <<'JAVA'
+          package com.aquipay.isabstudio;
+
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import com.google.android.play.core.review.ReviewInfo;
+          import com.google.android.play.core.review.ReviewManager;
+          import com.google.android.play.core.review.ReviewManagerFactory;
+
+          @CapacitorPlugin(name = "AquiPayReview")
+          public class AquiPayReviewPlugin extends Plugin {
+              @PluginMethod
+              public void requestReview(PluginCall call) {
+                  ReviewManager manager = ReviewManagerFactory.create(getContext());
+                  manager.requestReviewFlow().addOnCompleteListener(request -> {
+                      if (!request.isSuccessful()) { call.resolve(); return; }
+                      ReviewInfo reviewInfo = request.getResult();
+                      manager.launchReviewFlow(getActivity(), reviewInfo).addOnCompleteListener(flow -> call.resolve());
+                  });
+              }
+          }
+          JAVA
+          test -s android/app/src/main/java/com/aquipay/isabstudio/AquiPayReviewPlugin.java
 
       - name: Configure Firebase Cloud Messaging
         run: |
@@ -389,6 +415,21 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
+      - name: Install Google Play In-App Review dependency
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          gradle = Path("android/app/build.gradle")
+          source = gradle.read_text(encoding="utf-8")
+          dependency = "implementation 'com.google.android.play:review:2.0.2'"
+          if dependency not in source:
+              if "dependencies {" not in source:
+                  raise SystemExit("Could not find dependencies block in android/app/build.gradle")
+              source = source.replace("dependencies {", "dependencies {\\n    " + dependency, 1)
+              gradle.write_text(source, encoding="utf-8")
+          print("Google Play In-App Review 2.0.2 configured.")
+          PY
+
       - name: Configure Android SDK levels (min 24, target 36)
         run: |
           python - <<'PY'
@@ -439,7 +480,7 @@ jobs:
           print("Configured minSdkVersion=24, compileSdkVersion=36, targetSdkVersion=36, Android Gradle Plugin 8.9.1 and Gradle 8.11.1.")
           PY
 
-      - name: Set AquiPay release version (2 / 1.0.1)
+      - name: Set AquiPay release version (3 / 1.0.2)
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -448,15 +489,15 @@ jobs:
           gradle = Path("android/app/build.gradle")
           source = gradle.read_text(encoding="utf-8")
           patterns = [
-              (r"(?m)^(\s*versionCode\s*=?\s*)\d+(\s*(?://.*)?)$", r"\g<1>2\g<2>", "versionCode"),
-              (r'(?m)^(\s*versionName\s*=?\s*).+$', r'\g<1>"1.0.1"', "versionName"),
+              (r"(?m)^(\s*versionCode\s*=?\s*)\d+(\s*(?://.*)?)$", r"\g<1>3\g<2>", "versionCode"),
+              (r'(?m)^(\s*versionName\s*=?\s*).+$', r'\g<1>"1.0.2"', "versionName"),
           ]
           for pattern, replacement, label in patterns:
               source, count = re.subn(pattern, replacement, source)
               if count != 1:
                   raise SystemExit(f"Expected exactly one {label} setting in android/app/build.gradle; found {count}.")
           gradle.write_text(source, encoding="utf-8")
-          print("AquiPay Android version set to versionCode 2 and versionName 1.0.1.")
+          print("AquiPay Android version set to versionCode 3 and versionName 1.0.2.")
           PY
 
       - name: Resolve AndroidX Browser dependency conflict
