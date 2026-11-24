@@ -439,6 +439,26 @@ jobs:
           print("Configured minSdkVersion=24, compileSdkVersion=36, targetSdkVersion=36, Android Gradle Plugin 8.9.1 and Gradle 8.11.1.")
           PY
 
+      - name: Set AquiPay release version (2 / 1.0.1)
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          gradle = Path("android/app/build.gradle")
+          source = gradle.read_text(encoding="utf-8")
+          patterns = [
+              (r"(?m)^(\s*versionCode\s*=?\s*)\d+(\s*(?://.*)?)$", r"\g<1>2\g<2>", "versionCode"),
+              (r"(?m)^(\s*versionName\s*=?\s*)['"][^'"]+['"](\s*(?://.*)?)$", r'\g<1>"1.0.1"\g<2>', "versionName"),
+          ]
+          for pattern, replacement, label in patterns:
+              source, count = re.subn(pattern, replacement, source)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one {label} setting in android/app/build.gradle; found {count}.")
+          gradle.write_text(source, encoding="utf-8")
+          print("AquiPay Android version set to versionCode 2 and versionName 1.0.1.")
+          PY
+
       - name: Resolve AndroidX Browser dependency conflict
         run: |
           python - <<'PY'
