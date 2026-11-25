@@ -28,6 +28,9 @@ jobs:
         run: npx --yes esbuild@0.25.0 site/native-push-entry.js --bundle --platform=browser --format=iife --outfile=site/native-push.bundle.js
         # Native contacts plugin is bundled separately for the Android WebView.
 
+      - name: Bundle Google Play Billing for Android WebView
+        run: npx --yes esbuild@0.25.0 site/js/purchases.js --bundle --platform=browser --format=esm --target=es2020 --outfile=site/js/purchases.bundle.js
+
       - name: Deploy static assets
         working-directory: site
         env:
