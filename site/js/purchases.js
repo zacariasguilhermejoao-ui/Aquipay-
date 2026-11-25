@@ -8,13 +8,13 @@ import { Capacitor } from '@capacitor/core';
 
 export const PLAY_PRODUCTS = {
   coins: [
-    { id: 'coins_10', coins: 10, bonus: 0, priceUsd: 1 },
-    { id: 'coins_50', coins: 50, bonus: 0, priceUsd: 5 },
-    { id: 'coins_110', coins: 100, bonus: 10, priceUsd: 10 },
-    { id: 'coins_240', coins: 200, bonus: 40, priceUsd: 20 },
-    { id: 'coins_650', coins: 500, bonus: 150, priceUsd: 50 },
+    { id: 'aquipay_coins_10', coins: 10, bonus: 0, priceUsd: 1 },
+    { id: 'aquipay_coins_50', coins: 50, bonus: 0, priceUsd: 5 },
+    { id: 'aquipay_coins_110', coins: 100, bonus: 10, priceUsd: 10 },
+    { id: 'aquipay_coins_240', coins: 200, bonus: 40, priceUsd: 20 },
+    { id: 'aquipay_coins_650', coins: 500, bonus: 150, priceUsd: 50 },
   ],
-  plus: { id: '', basePlanId: '' },
+  plus: { id: 'aquipay_plus_monthly', basePlanId: 'monthly' },
 };
 
 const nativeAndroid = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
@@ -45,13 +45,13 @@ export async function loadCoinProducts() {
 
 export async function loadPlusProduct() {
   if (!nativeAndroid()) throw new Error('O Plus só pode ser comprado na aplicação Android.');
-  if (!PLAY_PRODUCTS.plus.id || !PLAY_PRODUCTS.plus.basePlanId) throw new Error('O produto e o plano mensal Plus serão ligados quando forem criados no Play Console.');
+  if (!PLAY_PRODUCTS.plus.id || !PLAY_PRODUCTS.plus.basePlanId) throw new Error('O produto e o plano mensal Plus não estão configurados.');
   if (!billingReady) {
     const ready = await initPurchases();
     if (!ready.ok) throw new Error('A Google Play Billing não está disponível neste dispositivo.');
   }
   const { products } = await NativePurchases.getProducts({ productIdentifiers: [PLAY_PRODUCTS.plus.id], productType: PURCHASE_TYPE.SUBS });
-  return (products || []).filter(p => p.identifier === PLAY_PRODUCTS.plus.basePlanId || p.planIdentifier === PLAY_PRODUCTS.plus.id);
+  return products || [];
 }
 
 async function sendForVerification(api, type, productId, transaction) {
@@ -81,7 +81,7 @@ export async function buyCoins(productId, api) {
 export async function buyPlus(api) {
   if (!nativeAndroid()) throw new Error('O Plus só pode ser comprado na aplicação Android.');
   const { id, basePlanId } = PLAY_PRODUCTS.plus;
-  if (!id || !basePlanId) throw new Error('O produto e o plano mensal Plus ainda não foram ligados ao Play Console.');
+  if (!id || !basePlanId) throw new Error('O produto e o plano mensal Plus não estão configurados.');
   const transaction = await NativePurchases.purchaseProduct({
     productIdentifier: id,
     planIdentifier: basePlanId,
