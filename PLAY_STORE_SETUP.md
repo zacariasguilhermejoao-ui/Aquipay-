@@ -1,67 +1,73 @@
 # AquiPay — Google Play Billing
 
-## Preços comerciais oficiais do AquiPay
+## Produtos configurados no Play Console
 
-Os preços abaixo são definidos pelo AquiPay. A Google Play é o meio de pagamento Android e aplica a conversão/localização de preço para cada mercado.
+Os cinco pacotes são produtos únicos consumíveis. O Plus é uma subscrição com renovação automática.
 
-| Product ID | Moedas pagas | Bónus grátis | Total creditado | Preço de referência |
+| Product ID | Moedas base | Bónus | Total creditado | Preço de referência |
 |---|---:|---:|---:|---:|
-| `coins_10` | 10 | 0 | 10 | **US$ 1** |
-| `coins_50` | 50 | 0 | 50 | **US$ 5** |
-| `coins_110` | 100 | 10 | 110 | **US$ 10** |
-| `coins_240` | 200 | 40 | 240 | **US$ 20** |
-| `coins_650` | 500 | 150 | 650 | **US$ 50** |
+| `aquipay_coins_10` | 10 | 0 | 10 | **US$ 0,99** |
+| `aquipay_coins_50` | 50 | 0 | 50 | **US$ 4,99** |
+| `aquipay_coins_110` | 100 | 10 | 110 | **US$ 9,99** |
+| `aquipay_coins_240` | 200 | 40 | 240 | **US$ 19,99** |
+| `aquipay_coins_650` | 500 | 150 | 650 | **US$ 49,99** |
 
-**AquiPay Plus:** US$ 20 por mês, subscrição com renovação automática.
+**AquiPay Plus**
+- Product ID: `aquipay_plus_monthly`
+- Base plan ID: `monthly`
+- Renovação automática mensal.
+- Preço configurado no Play Console: **19 EUR**. A Google Play apresenta o preço regional aplicável, incluindo a zona USD configurada para Angola.
 
-Regra comercial: 10 moedas pagas = US$ 1. Os bónus são moedas adicionais gratuitas, não alteram o preço.
+O preço efetivamente cobrado é o apresentado no ecrã oficial de compra da Google Play.
 
-## Identificação da aplicação
+## Identificação técnica
 
 - Package name: `com.aquipay.isabstudio`
-- Worker: `aquipay-api`
-- API de validação: `POST /api/billing/google/verify`
-- Plugin: `@capgo/native-purchases`
+- Cloudflare Worker: `aquipay-api`
+- Endpoint: `POST /api/billing/google/verify`
+- Plugin Android: `@capgo/native-purchases`
 - Base de dados: Cloudflare D1 `aquipay-db`
 
-## Configuração dos produtos na Google Play
+## Regras de crédito
 
-Criar estes IDs exatamente como estão na tabela. Os cinco pacotes são produtos únicos consumíveis. Criar também:
-- Product ID Plus: `aquipay_plus`
-- Base plan ID: `monthly`
-- Período: 1 mês
-- Preço-base: US$ 20 por mês
+- `aquipay_coins_10`: 10 moedas.
+- `aquipay_coins_50`: 50 moedas.
+- `aquipay_coins_110`: 100 moedas pagas + 10 de bónus.
+- `aquipay_coins_240`: 200 moedas pagas + 40 de bónus.
+- `aquipay_coins_650`: 500 moedas pagas + 150 de bónus.
 
-**Importante:** a Google Play exige que o preço de cada produto seja configurado no Play Console. Define ali os preços-base acima e confirma os preços localizados para os países onde o AquiPay estará disponível. O texto apresentado pela aplicação não será substituído pelo preço devolvido pelo catálogo da loja; a loja continua a cobrar o valor configurado no Play Console.
+As moedas são créditos virtuais de utilização dentro do AquiPay. Não são dinheiro, não podem ser levantadas nem transferidas entre utilizadores.
 
-Se os IDs finais forem diferentes, atualiza `PLAY_PRODUCTS` em `site/js/purchases.js`, `GOOGLE_PLAY_COIN_PRODUCTS` no Worker e as variáveis `GOOGLE_PLAY_PLUS_PRODUCT_ID` / `GOOGLE_PLAY_PLUS_BASE_PLAN_ID`.
+## Configuração no Cloudflare Worker
 
-## Validação segura
+O ficheiro `backend/wrangler.jsonc` define os IDs dos produtos e da subscrição. A credencial privada não deve ser guardada no GitHub.
 
-1. A aplicação inicia a compra pelo Google Play Billing.
-2. Envia o purchase token para o Worker autenticado.
-3. O Worker confirma a compra na Google Play Developer API.
-4. O servidor credita apenas as moedas pagas mais o bónus definido no catálogo oficial.
-5. O token é protegido por hash e a chave de idempotência impede creditações duplicadas.
-6. A subscrição Plus é validada pelo servidor através da Google Play Developer API.
+Adicionar no Worker `aquipay-api`, em **Settings → Variables and Secrets → Secrets**, o secret:
 
-## Credenciais necessárias
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`
 
-No Cloudflare Worker `aquipay-api`, manter o secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` com a conta de serviço autorizada no Play Console. Nunca colocar a chave privada no GitHub ou na aplicação.
+O valor deve ser o conteúdo integral do JSON da conta de serviço. Nunca o publiques no repositório, APK, AAB ou mensagens públicas.
 
-## Testes antes da produção
+A conta de serviço precisa de acesso à Google Play Developer API e às permissões necessárias para consultar e gerir compras e subscrições da aplicação.
 
-- Criar os produtos e preços no Play Console.
-- Configurar a conta de serviço e a API Android Publisher.
-- Enviar AAB para faixa de teste interno.
-- Testar os cinco pacotes, Plus, cancelamento e compra repetida.
-- Confirmar que o saldo só aumenta depois da validação no servidor.
+## Validação das compras
 
-## Estado
+1. O Android inicia a compra através do Google Play Billing.
+2. O aplicativo envia o token e o ID exato do produto para o Worker, com a sessão autenticada.
+3. O Worker valida o token na Google Play Developer API.
+4. Para moedas, o servidor credita o pacote e o bónus do catálogo, com proteção contra duplicação.
+5. Para Plus, o servidor valida o produto, o plano mensal e a data de expiração.
+6. O Worker consome compras de moedas e confirma subscrições.
 
-- [x] Preços comerciais e bónus definidos no código do AquiPay.
-- [x] Catálogo do Worker atualizado para creditar os totais corretos.
-- [x] Interface deixa de apresentar “Preço na Google Play”.
-- [ ] Configurar os preços correspondentes no Play Console.
-- [ ] Confirmar os IDs definitivos e o produto Plus.
-- [ ] Testar compras reais na faixa interna antes da publicação.
+## Antes de produção
+
+- [x] IDs dos cinco pacotes alinhados entre app e Worker.
+- [x] ID do produto Plus e base plan alinhados.
+- [x] Catálogo de moedas atualizado com os bónus corretos.
+- [x] Interface deixa de mostrar preços fixos incorretos.
+- [ ] Configurar o secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` no Cloudflare.
+- [ ] Confirmar permissões da conta de serviço no Play Console.
+- [ ] Executar compras de ponta a ponta numa faixa de teste antes do lançamento em produção.
+- [ ] Confirmar recuperação, cancelamento, reembolso e revogação de compras/subscrições.
+
+**Nota:** a compilação do APK/AAB não comprova que as compras estão funcionais. A validação real depende da credencial Google e de uma compra reconhecida pela Play Store.
