@@ -146,8 +146,7 @@ const tools = [
     name:"aquipay_list_my_conversations",
     description:"Lista conversas do utilizador autenticado sem expor mensagens de outras contas.",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
-  }
-
+  },
   {
     name:"aquipay_list_my_followers",
     description:"Lista os utilizadores que seguem o perfil autenticado.",
