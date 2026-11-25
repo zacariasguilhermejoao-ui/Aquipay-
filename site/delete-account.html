@@ -28,7 +28,9 @@ a{color:#c4b5fd}small{color:#a1a1aa;display:block;margin-top:14px}
 <label for="password">Palavra-passe</label>
 <input id="password" type="password" autocomplete="current-password" required placeholder="Palavra-passe da conta">
 <label for="code">Código do autenticador (se ativado)</label>
-<input id="code" type="text" inputmode="text" autocomplete="one-time-code" placeholder="Código de 6 dígitos ou recuperação">
+<input id="code" type="text" inputmode="text" autocomplete="one-time-code" placeholder="Código do autenticador ou recuperação">
+<label for="emailCode">Código enviado ao teu e-mail</label>
+<input id="emailCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Código de 6 dígitos">
 <button id="submit" type="submit">Confirmar pedido de eliminação</button>
 </form>
 <div id="googleButton" style="margin-top:12px"></div>
@@ -40,10 +42,32 @@ a{color:#c4b5fd}small{color:#a1a1aa;display:block;margin-top:14px}
  const API='https://api.aquipay.isabstudio.dev';
  const CLIENT='34883461021-8c95ocf3la4lmc087dqhu9l82jji3qpd.apps.googleusercontent.com';
  const status=document.getElementById('status'),form=document.getElementById('requestForm'),button=document.getElementById('submit');
+ let googleCredential='';
  function message(text,ok){status.textContent=text;status.className=ok?'ok':'err'}
- async function send(body){button.disabled=true;try{const r=await fetch(API+'/api/account-deletion/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Não foi possível registar o pedido.');const date=d.deletionDueAt?new Date(d.deletionDueAt).toLocaleDateString('pt-AO'):'dentro de 30 dias';form.style.display='none';document.getElementById('googleButton').style.display='none';message((d.alreadyRequested?'Já existia um pedido.':'Pedido registado com sucesso.')+' A tua conta será eliminada permanentemente em '+date+'. Para cancelar, inicia sessão no Aquipay antes dessa data.',true)}catch(e){message(e.message||'Erro de ligação. Tenta novamente.',false)}finally{button.disabled=false}}
- form.addEventListener('submit',e=>{e.preventDefault();send({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value,code:document.getElementById('code').value.trim()})});
- function initGoogle(){if(!window.google||!google.accounts||!google.accounts.id)return;google.accounts.id.initialize({client_id:CLIENT,callback:resp=>send({credential:resp.credential,code:document.getElementById('code').value.trim()})});google.accounts.id.renderButton(document.getElementById('googleButton'),{theme:'filled_black',size:'large',shape:'pill',text:'continue_with',width:400})}
+ async function send(body){
+  button.disabled=true;
+  try{
+   const r=await fetch(API+'/api/account-deletion/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(d.error||'Não foi possível registar o pedido.');
+   if(d.requiresEmailCode){message('Enviámos um código de 6 dígitos para o e-mail associado à conta. Introduz o código e confirma o pedido. O código expira em 5 minutos.',true);document.getElementById('emailCode').focus();button.textContent='Confirmar pedido de eliminação';return}
+   const date=d.deletionDueAt?new Date(d.deletionDueAt).toLocaleDateString('pt-AO'):'dentro de 30 dias';
+   form.style.display='none';document.getElementById('googleButton').style.display='none';
+   message((d.alreadyRequested?'Já existia um pedido.':'Pedido registado com sucesso.')+' A tua conta será eliminada permanentemente em '+date+'. Para cancelar, inicia sessão no Aquipay antes dessa data.',true);
+  }catch(e){message(e.message||'Erro de ligação. Tenta novamente.',false)}
+  finally{button.disabled=false}
+ }
+ form.addEventListener('submit',e=>{
+  e.preventDefault();
+  const emailCode=document.getElementById('emailCode').value.trim(),code=document.getElementById('code').value.trim();
+  const body=googleCredential?{credential:googleCredential,code,emailCode}:{email:document.getElementById('email').value.trim(),password:document.getElementById('password').value,code,emailCode};
+  send(body);
+ });
+ function initGoogle(){
+  if(!window.google||!google.accounts||!google.accounts.id)return;
+  google.accounts.id.initialize({client_id:CLIENT,callback:resp=>{googleCredential=resp.credential;send({credential:googleCredential,code:document.getElementById('code').value.trim()})}});
+  google.accounts.id.renderButton(document.getElementById('googleButton'),{theme:'filled_black',size:'large',shape:'pill',text:'continue_with',width:400});
+ }
  const timer=setInterval(()=>{if(window.google?.accounts?.id){clearInterval(timer);initGoogle()}},250);
 })();
 </script>
