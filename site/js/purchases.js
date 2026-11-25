@@ -8,11 +8,11 @@ import { Capacitor } from '@capacitor/core';
 
 export const PLAY_PRODUCTS = {
   coins: [
-    { id: 'aquipay_coins_10', coins: 10, bonus: 0, priceUsd: 1 },
-    { id: 'aquipay_coins_50', coins: 50, bonus: 0, priceUsd: 5 },
-    { id: 'aquipay_coins_110', coins: 100, bonus: 10, priceUsd: 10 },
-    { id: 'aquipay_coins_240', coins: 200, bonus: 40, priceUsd: 20 },
-    { id: 'aquipay_coins_650', coins: 500, bonus: 150, priceUsd: 50 },
+    { id: 'aquipay_coins_10', coins: 10, bonus: 0, priceUsd: 0.99 },
+    { id: 'aquipay_coins_50', coins: 50, bonus: 0, priceUsd: 4.99 },
+    { id: 'aquipay_coins_110', coins: 100, bonus: 10, priceUsd: 9.99 },
+    { id: 'aquipay_coins_240', coins: 200, bonus: 40, priceUsd: 19.99 },
+    { id: 'aquipay_coins_650', coins: 500, bonus: 150, priceUsd: 49.99 },
   ],
   plus: { id: 'aquipay_plus_monthly', basePlanId: 'monthly' },
 };
