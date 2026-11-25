@@ -29,9 +29,9 @@ async function googleClaims(credential,clientId){
  return claims;
 }
 async function authorizeGet(req,env){
- const u=new URL(req.url),clientId=u.searchParams.get("client_id")||"",redirectUri=u.searchParams.get("redirect_uri")||"",challenge=u.searchParams.get("code_challenge")||"",method=u.searchParams.get("code_challenge_method")||"",state=u.searchParams.get("state")||"",responseType=u.searchParams.get("response_type")||"",resource=u.searchParams.get("resource")||"";
+ const u=new URL(req.url),clientId=u.searchParams.get("client_id")||"",redirectUri=u.searchParams.get("redirect_uri")||"",challenge=u.searchParams.get("code_challenge")||"",method=u.searchParams.get("code_challenge_method")||"",state=u.searchParams.get("state")||"",responseType=u.searchParams.get("response_type")||"",resource=u.searchParams.get("resource")||"https://aquipay-api.osamariches.workers.dev/mcp";
  const client=await getClient(env,clientId);let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
- if(!client||!redirects.includes(redirectUri)||responseType!=="code"||method!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)||!state||state.length>512)return formPage("Pedido inválido","<p class='error'>O pedido de autorização é inválido ou expirou. Volta à aplicação de IA e tenta novamente.</p>");
+ if(!client||!redirects.includes(redirectUri)||responseType!=="code"||method!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)||!state||state.length>512||resource!=="https://aquipay-api.osamariches.workers.dev/mcp")return formPage("Pedido inválido","<p class='error'>O pedido de autorização é inválido ou expirou. Volta à aplicação de IA e tenta novamente.</p>");
  const requested=scopesParse(u.searchParams.get("scope")||OAUTH_SCOPES.join(" "));if(!requested.length||requested.some(s=>!OAUTH_SCOPES.includes(s)))return formPage("Permissões inválidas","<p class='error'>A aplicação pediu permissões não suportadas.</p>");
  const hidden=(k,v)=>`<input type="hidden" name="${k}" value="${htmlEscape(v)}">`;
  const fields=hidden("client_id",clientId)+hidden("redirect_uri",redirectUri)+hidden("code_challenge",challenge)+hidden("code_challenge_method","S256")+hidden("state",state)+hidden("scope",requested.join(" "))+hidden("resource",resource);
@@ -71,7 +71,7 @@ async function authorizePost(req,env){
  const scopes=approved.join(" "),now=new Date().toISOString(),codeRaw=rand(),expires=new Date(Date.now()+300000).toISOString();
  await env.DB.batch([
   env.DB.prepare("INSERT INTO oauth_consents(user_id,client_id,scopes,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id,client_id) DO UPDATE SET scopes=excluded.scopes,updated_at=excluded.updated_at").bind(user.id,clientId,scopes,now),
-  env.DB.prepare("INSERT INTO oauth_codes(code_hash,client_id,user_id,redirect_uri,code_challenge,scopes,expires_at) VALUES(?,?,?,?,?,?,?)").bind(await hash(codeRaw),clientId,user.id,redirectUri,challenge,scopes,expires)
+  env.DB.prepare("INSERT INTO oauth_codes(code_hash,client_id,user_id,redirect_uri,code_challenge,scopes,expires_at,resource) VALUES(?,?,?,?,?,?,?,?)").bind(await hash(codeRaw),clientId,user.id,redirectUri,challenge,scopes,expires,resource)
  ]);
  return redirectWith(redirectUri,{code:codeRaw,state});
 }
@@ -80,20 +80,20 @@ async function tokenPost(req,env){
  if(!clientId)return json({error:"invalid_client"},401);
  const client=await getClient(env,clientId);if(!client)return json({error:"invalid_client"},401);
  if(grant==="authorization_code"){
-  const code=form.get("code")||"",redirectUri=form.get("redirect_uri")||"",verifier=form.get("code_verifier")||"";
+  const code=form.get("code")||"",redirectUri=form.get("redirect_uri")||"",verifier=form.get("code_verifier")||"",resource=form.get("resource")||"https://aquipay-api.osamariches.workers.dev/mcp";
   if(!code||!verifier||verifier.length<43||verifier.length>128)return json({error:"invalid_grant"});
-  const row=await env.DB.prepare("SELECT * FROM oauth_codes WHERE code_hash=? AND client_id=? AND redirect_uri=? AND expires_at>?").bind(await hash(code),clientId,redirectUri,new Date().toISOString()).first();
+  const row=await env.DB.prepare("SELECT * FROM oauth_codes WHERE code_hash=? AND client_id=? AND redirect_uri=? AND resource=? AND expires_at>?").bind(await hash(code),clientId,redirectUri,resource,new Date().toISOString()).first();
   if(!row)return json({error:"invalid_grant"});
   const challenge=b64(await crypto.subtle.digest("SHA-256",enc.encode(verifier)));
   if(challenge!==row.code_challenge)return json({error:"invalid_grant"});
   const deleted=await env.DB.prepare("DELETE FROM oauth_codes WHERE code_hash=? AND client_id=?").bind(await hash(code),clientId).run();
   if(!deleted.meta?.changes)return json({error:"invalid_grant"});
   const access=rand(),refresh=rand(),now=Date.now(),accessExpiry=new Date(now+900000).toISOString(),refreshExpiry=new Date(now+30*86400000).toISOString();
-  await env.DB.prepare("INSERT INTO oauth_tokens(id,client_id,user_id,scopes,access_hash,refresh_hash,access_expires_at,refresh_expires_at) VALUES(?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),clientId,row.user_id,row.scopes,await hash(access),await hash(refresh),accessExpiry,refreshExpiry).run();
+  await env.DB.prepare("INSERT INTO oauth_tokens(id,client_id,user_id,scopes,access_hash,refresh_hash,access_expires_at,refresh_expires_at,resource) VALUES(?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),clientId,row.user_id,row.scopes,await hash(access),await hash(refresh),accessExpiry,refreshExpiry,row.resource).run();
   return json({access_token:access,token_type:"Bearer",expires_in:900,refresh_token:refresh,scope:row.scopes});
  }
  if(grant==="refresh_token"){
-  const refresh=form.get("refresh_token")||"",row=await env.DB.prepare("SELECT * FROM oauth_tokens WHERE refresh_hash=? AND client_id=? AND revoked_at IS NULL AND refresh_expires_at>?").bind(await hash(refresh),clientId,new Date().toISOString()).first();
+  const refresh=form.get("refresh_token")||"",resource=form.get("resource")||"https://aquipay-api.osamariches.workers.dev/mcp",row=await env.DB.prepare("SELECT * FROM oauth_tokens WHERE refresh_hash=? AND client_id=? AND resource=? AND revoked_at IS NULL AND refresh_expires_at>?").bind(await hash(refresh),clientId,resource,new Date().toISOString()).first();
   if(!row)return json({error:"invalid_grant"});
   const access=rand(),nextRefresh=rand(),accessExpiry=new Date(Date.now()+900000).toISOString(),refreshExpiry=new Date(Date.now()+30*86400000).toISOString();
   const changed=await env.DB.prepare("UPDATE oauth_tokens SET access_hash=?,refresh_hash=?,access_expires_at=?,refresh_expires_at=?,last_used_at=? WHERE id=? AND refresh_hash=? AND revoked_at IS NULL").bind(await hash(access),await hash(nextRefresh),accessExpiry,refreshExpiry,new Date().toISOString(),row.id,await hash(refresh)).run();
