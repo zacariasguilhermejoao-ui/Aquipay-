@@ -17,6 +17,17 @@ async function verifyTotp(secret,code){if(!/^\d{6}$/.test(String(code||"")))retu
 async function decryptTotp(value,env){const raw=b64d(env.TOTP_ENCRYPTION_KEY||"");if(raw.length!==32)throw Error("2FA indisponível");const key=await crypto.subtle.importKey("raw",raw,"AES-GCM",false,["decrypt"]),packed=b64d(value),plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:packed.slice(0,12)},key,packed.slice(12));return new TextDecoder().decode(plain)}
 function redirectWith(uri,params){const u=new URL(uri);for(const[k,v]of Object.entries(params))if(v!==undefined&&v!==null)u.searchParams.set(k,String(v));return Response.redirect(u.toString(),302)}
 async function getClient(env,id){return env.DB.prepare("SELECT client_id,client_name,redirect_uris FROM oauth_clients WHERE client_id=?").bind(id).first()}
+async function googleClaims(credential,clientId){
+ const parts=String(credential||"").split(".");if(parts.length!==3)throw Error("jwt");
+ const header=JSON.parse(new TextDecoder().decode(b64d(parts[0]))),claims=JSON.parse(new TextDecoder().decode(b64d(parts[1])));
+ if(header.alg!=="RS256"||!header.kid)throw Error("alg");
+ const response=await fetch("https://www.googleapis.com/oauth2/v3/certs",{cf:{cacheTtl:3600,cacheEverything:true}});
+ const jwks=await response.json(),jwk=(jwks.keys||[]).find(k=>k.kid===header.kid);if(!jwk)throw Error("kid");
+ const key=await crypto.subtle.importKey("jwk",jwk,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
+ if(!await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,b64d(parts[2]),enc.encode(parts[0]+"."+parts[1])))throw Error("sig");
+ if(!["accounts.google.com","https://accounts.google.com"].includes(claims.iss)||!String(clientId||"").split(",").map(x=>x.trim()).filter(Boolean).includes(claims.aud)||!(claims.exp>Date.now()/1000)||!claims.sub)throw Error("claims");
+ return claims;
+}
 async function authorizeGet(req,env){
  const u=new URL(req.url),clientId=u.searchParams.get("client_id")||"",redirectUri=u.searchParams.get("redirect_uri")||"",challenge=u.searchParams.get("code_challenge")||"",method=u.searchParams.get("code_challenge_method")||"",state=u.searchParams.get("state")||"",responseType=u.searchParams.get("response_type")||"",resource=u.searchParams.get("resource")||"";
  const client=await getClient(env,clientId);let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
@@ -25,7 +36,7 @@ async function authorizeGet(req,env){
  const hidden=(k,v)=>`<input type="hidden" name="${k}" value="${htmlEscape(v)}">`;
  const fields=hidden("client_id",clientId)+hidden("redirect_uri",redirectUri)+hidden("code_challenge",challenge)+hidden("code_challenge_method","S256")+hidden("state",state)+hidden("scope",requested.join(" "))+hidden("resource",resource);
  const scopes=requested.map(s=>`<label class="scope"><input type="checkbox" name="approved_scope" value="${s}" checked> ${scopeLabel(s)}</label>`).join("");
- const body=`<p><b>${htmlEscape(client.client_name)}</b> quer ligar-se à tua conta AquiPay. Escolhe o que autorizas. Não partilhes a tua palavra-passe com a IA.</p><form method="post" action="/oauth/authorize">${fields}<label>Email da conta</label><input name="email" type="email" autocomplete="username" required><label>Palavra-passe</label><input name="password" type="password" autocomplete="current-password" required><label>Código de autenticação (se tiveres 2FA)</label><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20"><div style="margin-top:18px"><b>Permissões pedidas</b>${scopes}</div><button name="decision" value="approve">Autorizar AquiPay</button><button class="secondary" name="decision" value="deny" formnovalidate>Recusar</button></form><p class="muted">Podes revogar esta ligação a qualquer momento nas Definições do AquiPay.</p>`;
+ const body=`<p><b>${htmlEscape(client.client_name)}</b> quer ligar-se à tua conta AquiPay. Escolhe o que autorizas. Não partilhes a tua palavra-passe com a IA.</p><form id="oauthConsent" method="post" action="/oauth/authorize">${fields}<input type="hidden" name="credential" id="googleCredential"><input type="hidden" name="decision" id="oauthDecision" value="approve"><label>Email da conta</label><input name="email" type="email" autocomplete="username"><label>Palavra-passe</label><input name="password" type="password" autocomplete="current-password"><label>Código de autenticação (se tiveres 2FA)</label><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20"><div style="margin-top:18px"><b>Permissões pedidas</b>${scopes}</div><button type="submit" onclick="document.getElementById('oauthDecision').value='approve'">Autorizar AquiPay</button><button type="submit" class="secondary" onclick="document.getElementById('oauthDecision').value='deny'">Recusar</button></form>${env.GOOGLE_CLIENT_ID?`<script src="https://accounts.google.com/gsi/client" async defer></script><div id="g_id_onload" data-client_id="${htmlEscape(env.GOOGLE_CLIENT_ID.split(",")[0])}" data-callback="aquipayGoogleCredential" data-auto_prompt="false"></div><div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="continue_with" data-size="large" style="margin-top:14px"></div><script>window.aquipayGoogleCredential=function(r){document.getElementById("googleCredential").value=r.credential;document.getElementById("oauthConsent").submit()}</script>`:""}<p class="muted">Podes revogar esta ligação a qualquer momento nas Definições do AquiPay.</p>`;
  return formPage("Ligar ao AquiPay",body);
 }
 async function authorizePost(req,env){
@@ -36,12 +47,21 @@ async function authorizePost(req,env){
  if(decision!=="approve")return redirectWith(redirectUri,{error:"access_denied",error_description:"O utilizador recusou o acesso.",state});
  const requested=scopesParse(v("scope")),approved=scopesParse(form.getAll("approved_scope").join(" "));
  if(!requested.length||requested.some(s=>!OAUTH_SCOPES.includes(s))||approved.some(s=>!requested.includes(s))||!approved.length)return formPage("Permissões inválidas","<p class='error'>Seleciona pelo menos uma permissão válida.</p>");
- const email=v("email").trim().toLowerCase(),password=v("password"),code=v("code").trim();
+ const email=v("email").trim().toLowerCase(),password=v("password"),code=v("code").trim(),credential=v("credential");
  const rlKey="oauth_login:"+(req.headers.get("cf-connecting-ip")||"unknown")+":"+Math.floor(Date.now()/900000);
  const rl=await env.DB.prepare("INSERT INTO rate_limits(k,n,exp) VALUES(?,1,?) ON CONFLICT(k) DO UPDATE SET n=n+1 RETURNING n").bind(rlKey,Date.now()+1800000).first();
  if(rl?.n>10)return formPage("Tenta mais tarde","<p class='error'>Demasiadas tentativas. Aguarda e tenta novamente.</p>");
- const user=await env.DB.prepare("SELECT id,name,email,password_hash,password_salt,status,deletion_requested_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE email=?").bind(email).first();
- if(!user||user.status!=="active"||user.deletion_requested_at||!password||await passHash(password,user.password_salt)!==user.password_hash)return formPage("Não foi possível autorizar","<p class='error'>Email ou palavra-passe incorretos, ou conta indisponível. Volta a tentar.</p>");
+ let user=null;
+ if(credential){
+   let claims;try{claims=await googleClaims(credential,env.GOOGLE_CLIENT_ID)}catch{return formPage("Google não validado","<p class='error'>Não foi possível validar a tua conta Google. Tenta novamente.</p>")}
+   const googleEmail=String(claims.email||"").toLowerCase();
+   if((claims.email_verified!==true&&claims.email_verified!=="true")||!googleEmail.includes("@"))return formPage("Conta Google inválida","<p class='error'>O email da conta Google não está verificado.</p>");
+   user=await env.DB.prepare("SELECT id,name,email,password_hash,password_salt,status,deletion_requested_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE google_sub=? OR email=?").bind(claims.sub,googleEmail).first();
+   if(user&&user.status==="active")await env.DB.prepare("UPDATE users SET google_sub=COALESCE(google_sub,?) WHERE id=?").bind(claims.sub,user.id).run();
+ }else{
+   user=await env.DB.prepare("SELECT id,name,email,password_hash,password_salt,status,deletion_requested_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE email=?").bind(email).first();
+   if(!user||user.status!=="active"||user.deletion_requested_at||!password||await passHash(password,user.password_salt)!==user.password_hash)return formPage("Não foi possível autorizar","<p class='error'>Email ou palavra-passe incorretos, ou conta indisponível. Volta a tentar.</p>");
+ }
  if(user.totp_enabled){
    let ok=false;try{const secret=await decryptTotp(user.totp_secret,env);ok=await verifyTotp(secret,code)}catch{}
    if(!ok){let codes=[];try{codes=JSON.parse(user.totp_recovery_hashes||"[]")}catch{}const normalized=code.toUpperCase().replace(/[^A-Z2-7]/g,""),candidate=normalized?await hash(normalized):"",i=codes.indexOf(candidate);if(i>=0){codes.splice(i,1);await env.DB.prepare("UPDATE users SET totp_recovery_hashes=? WHERE id=?").bind(JSON.stringify(codes),user.id).run();ok=true}}
