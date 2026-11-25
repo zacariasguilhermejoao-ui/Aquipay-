@@ -231,11 +231,11 @@ async function createEmailActionCode(env,userId,email,purpose,lang='pt'){
  if(recent&&Date.now()-Date.parse(recent.created_at)<60000)throw Error('email_code_cooldown');
  const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0'),salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await emailCodeHash(code,salt,env),id=uid(),now=new Date().toISOString(),expires=new Date(Date.now()+5*60000).toISOString();
  await env.DB.batch([env.DB.prepare('DELETE FROM email_action_codes WHERE user_id=? AND purpose=?').bind(userId,purpose),env.DB.prepare('INSERT INTO email_action_codes(id,user_id,purpose,email,code_hash,salt,expires_at,attempts,created_at) VALUES(?,?,?,?,?,?,?,0,?)').bind(id,userId,purpose,email,hash,salt,expires,now)]);
- try{await sendEmailActionCode(env,email,'',code,purpose,lang)}catch(e){await env.DB.prepare('DELETE FROM email_action_codes WHERE id=?').bind(id).run();throw e}
+ const owner=await env.DB.prepare('SELECT name FROM users WHERE id=?').bind(userId).first();try{await sendEmailActionCode(env,email,owner?.name||'',code,purpose,lang)}catch(e){await env.DB.prepare('DELETE FROM email_action_codes WHERE id=?').bind(id).run();throw e}
  return {expiresIn:300,resendAfter:60};
 }
 async function verifyEmailActionCode(env,userId,purpose,email,code){
- const value=String(code||'').trim();if(!/^\\d{6}$/.test(value))return false;
+ const value=String(code||'').trim();if(!/^\d{6}$/.test(value))return false;
  const row=await env.DB.prepare('SELECT id,code_hash,salt,expires_at,attempts FROM email_action_codes WHERE user_id=? AND purpose=? AND email=? ORDER BY created_at DESC LIMIT 1').bind(userId,purpose,email).first();
  if(!row||row.attempts>=5||row.expires_at<new Date().toISOString()){if(row)await env.DB.prepare('DELETE FROM email_action_codes WHERE id=?').bind(row.id).run();return false}
  const hash=await emailCodeHash(value,row.salt,env);
