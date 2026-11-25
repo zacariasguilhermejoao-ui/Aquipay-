@@ -65,7 +65,7 @@ a{color:#c4b5fd}small{color:#a1a1aa;display:block;margin-top:14px}
  });
  function initGoogle(){
   if(!window.google||!google.accounts||!google.accounts.id)return;
-  google.accounts.id.initialize({client_id:CLIENT,callback:resp=>{googleCredential=resp.credential;send({credential:googleCredential,code:document.getElementById('code').value.trim()})}});
+  google.accounts.id.initialize({client_id:CLIENT,callback:resp=>{googleCredential=resp.credential;document.getElementById('email').required=false;document.getElementById('password').required=false;send({credential:googleCredential,code:document.getElementById('code').value.trim()})}});
   google.accounts.id.renderButton(document.getElementById('googleButton'),{theme:'filled_black',size:'large',shape:'pill',text:'continue_with',width:400});
  }
  const timer=setInterval(()=>{if(window.google?.accounts?.id){clearInterval(timer);initGoogle()}},250);
