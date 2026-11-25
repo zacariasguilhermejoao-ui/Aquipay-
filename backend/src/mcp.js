@@ -102,6 +102,46 @@ const tools = [
       proposalId:{type:"string"},status:{type:"string",enum:["accepted","rejected","completed"]},confirm:{type:"boolean"}
     },additionalProperties:false}
   },
+
+  {
+    name:"aquipay_get_my_stats",
+    description:"Mostra estatísticas da atividade do utilizador: anúncios, propostas, conversas, mensagens e seguidores.",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  {
+    name:"aquipay_update_my_profile",
+    description:"Atualiza o perfil profissional próprio. Exige confirm=true.",
+    inputSchema:{type:"object",required:["confirm"],properties:{
+      name:{type:"string",minLength:2,maxLength:80},city:{type:"string",maxLength:100},bio:{type:"string",maxLength:2000},
+      professions:{type:"array",items:{type:"string",maxLength:80},maxItems:20},
+      skills:{type:"array",items:{type:"string",maxLength:80},maxItems:50},confirm:{type:"boolean"}
+    },additionalProperties:false}
+  },
+  {
+    name:"aquipay_list_my_notifications",
+    description:"Lista notificações da conta autenticada, incluindo estado de leitura.",
+    inputSchema:{type:"object",properties:{unreadOnly:{type:"boolean"},limit:{type:"integer",minimum:1,maximum:50}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_mark_notifications_read",
+    description:"Marca como lidas notificações próprias. Pode marcar uma notificação ou todas. Exige confirm=true.",
+    inputSchema:{type:"object",required:["confirm"],properties:{notificationId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_get_conversation_messages",
+    description:"Consulta mensagens de uma conversa da qual o utilizador autenticado é participante.",
+    inputSchema:{type:"object",required:["conversationId"],properties:{conversationId:{type:"string"},limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_send_message",
+    description:"Envia mensagem numa conversa da qual o utilizador autenticado é participante. Exige confirm=true.",
+    inputSchema:{type:"object",required:["conversationId","message","confirm"],properties:{conversationId:{type:"string"},message:{type:"string",minLength:1,maxLength:4000},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_get_subscription",
+    description:"Consulta o plano atual e a data de validade da subscrição AquiPay.",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
   {
     name:"aquipay_list_my_conversations",
     description:"Lista conversas do utilizador autenticado sem expor mensagens de outras contas.",
@@ -235,6 +275,74 @@ async function callTool(name,args,env,user) {
     ).bind(user.id,user.id,user.id,user.id).all();
     return {conversations:rows.results||[]};
   }
+
+  if (name==="aquipay_get_my_stats") {
+    const [listings,proposals,conversations,messages,followers,following]=await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) total,SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) active FROM listings WHERE owner_id=?").bind(user.id).first(),
+      env.DB.prepare("SELECT COUNT(*) total,SUM(CASE WHEN sender_id=? THEN 1 ELSE 0 END) sent,SUM(CASE WHEN receiver_id=? THEN 1 ELSE 0 END) received,SUM(CASE WHEN status='accepted' THEN 1 ELSE 0 END) accepted,SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed FROM proposals WHERE sender_id=? OR receiver_id=?").bind(user.id,user.id,user.id,user.id).first(),
+      env.DB.prepare("SELECT COUNT(*) total FROM conversations WHERE participant_a=? OR participant_b=?").bind(user.id,user.id).first(),
+      env.DB.prepare("SELECT COUNT(*) total FROM messages WHERE sender_id=?").bind(user.id).first(),
+      env.DB.prepare("SELECT COUNT(*) total FROM user_follows WHERE followed_id=?").bind(user.id).first(),
+      env.DB.prepare("SELECT COUNT(*) total FROM user_follows WHERE follower_id=?").bind(user.id).first()
+    ]);
+    return {listings:{total:Number(listings?.total||0),active:Number(listings?.active||0)},proposals:{total:Number(proposals?.total||0),sent:Number(proposals?.sent||0),received:Number(proposals?.received||0),accepted:Number(proposals?.accepted||0),completed:Number(proposals?.completed||0)},conversations:Number(conversations?.total||0),messagesSent:Number(messages?.total||0),followers:Number(followers?.total||0),following:Number(following?.total||0)};
+  }
+  if (name==="aquipay_update_my_profile") {
+    if(args.confirm!==true)throw new Error("Atualização não executada. Define confirm=true.");
+    const current=await env.DB.prepare("SELECT u.name,p.city,p.bio,p.professions_json,p.skills_json FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
+    if(!current)throw new Error("Perfil não encontrado.");
+    const name=args.name===undefined?current.name:String(args.name).trim();
+    const city=args.city===undefined?current.city:String(args.city).trim().slice(0,100);
+    const bio=args.bio===undefined?current.bio:String(args.bio).trim().slice(0,2000);
+    const professions=args.professions===undefined?current.professions_json:JSON.stringify(args.professions.map(x=>String(x).trim()).filter(Boolean).slice(0,20));
+    const skills=args.skills===undefined?current.skills_json:JSON.stringify(args.skills.map(x=>String(x).trim()).filter(Boolean).slice(0,50));
+    if(name.length<2||name.length>80)throw new Error("Nome inválido.");
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET name=? WHERE id=?").bind(name,user.id),
+      env.DB.prepare("UPDATE profiles SET city=?,bio=?,professions_json=?,skills_json=?,updated_at=? WHERE user_id=?").bind(city,bio,professions,skills,new Date().toISOString(),user.id)
+    ]);
+    return {ok:true,message:"Perfil atualizado."};
+  }
+  if (name==="aquipay_list_my_notifications") {
+    const limit=Number.isInteger(args.limit)?Math.max(1,Math.min(50,args.limit)):25;
+    const unread=args.unreadOnly===true;
+    const rows=await env.DB.prepare("SELECT id,kind,title,body,data_json,read_at,created_at FROM notifications WHERE user_id=? AND (?=0 OR read_at IS NULL) ORDER BY created_at DESC LIMIT ?").bind(user.id,unread?1:0,limit).all();
+    return {notifications:rows.results||[],unreadOnly:unread};
+  }
+  if (name==="aquipay_mark_notifications_read") {
+    if(args.confirm!==true)throw new Error("Ação não executada. Define confirm=true.");
+    const id=typeof args.notificationId==="string"?args.notificationId.trim():"";
+    const now=new Date().toISOString();
+    const result=id
+      ? await env.DB.prepare("UPDATE notifications SET read_at=? WHERE id=? AND user_id=? AND read_at IS NULL").bind(now,id,user.id).run()
+      : await env.DB.prepare("UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL").bind(now,user.id).run();
+    return {ok:true,marked:Number(result.meta?.changes||0),message:"Notificações atualizadas."};
+  }
+  if (name==="aquipay_get_conversation_messages") {
+    const id=String(args.conversationId||"").trim(),limit=Number.isInteger(args.limit)?Math.max(1,Math.min(100,args.limit)):50;
+    const conversation=await env.DB.prepare("SELECT id FROM conversations WHERE id=? AND (participant_a=? OR participant_b=?)").bind(id,user.id,user.id).first();
+    if(!conversation)throw new Error("Conversa não encontrada ou sem autorização.");
+    const rows=await env.DB.prepare("SELECT m.id,m.sender_id,u.name sender_name,m.body,m.read_at,m.created_at FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.conversation_id=? ORDER BY m.created_at DESC LIMIT ?").bind(id,limit).all();
+    return {conversationId:id,messages:(rows.results||[]).reverse()};
+  }
+  if (name==="aquipay_send_message") {
+    if(args.confirm!==true)throw new Error("Mensagem não enviada. Define confirm=true.");
+    const id=String(args.conversationId||"").trim(),body=typeof args.message==="string"?args.message.trim():"";
+    if(!body||body.length>4000)throw new Error("Mensagem inválida.");
+    const c=await env.DB.prepare("SELECT id,participant_a,participant_b FROM conversations WHERE id=? AND (participant_a=? OR participant_b=?)").bind(id,user.id,user.id).first();
+    if(!c)throw new Error("Conversa não encontrada ou sem autorização.");
+    const recipient=c.participant_a===user.id?c.participant_b:c.participant_a,now=new Date().toISOString(),messageId=crypto.randomUUID();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO messages(id,conversation_id,sender_id,body) VALUES(?,?,?,?)").bind(messageId,id,user.id,body),
+      env.DB.prepare("INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),recipient,"message","Nova mensagem","Recebeste uma nova mensagem no AquiPay.",JSON.stringify({conversationId:id,url:"/?conversation="+encodeURIComponent(id)}))
+    ]);
+    return {ok:true,messageId,conversationId:id,message:"Mensagem enviada."};
+  }
+  if (name==="aquipay_get_subscription") {
+    const row=await env.DB.prepare("SELECT product_id,status,expires_at,updated_at FROM user_subscriptions WHERE user_id=?").bind(user.id).first();
+    const active=!!row&&row.status==="active"&&row.expires_at>new Date().toISOString();
+    return {plan:active?"plus":"free",subscription:row||null,active,description:active?"Plano Plus ativo.":"Plano gratuito ativo."};
+  }
   throw new Error("Ferramenta não encontrada.");
 }
 
@@ -252,7 +360,7 @@ export async function handleAquiPayMcp(request,env) {
   if(!authenticated){
     return new Response(JSON.stringify({jsonrpc:"2.0",id:message.id??null,error:{code:-32001,message:"Autenticação OAuth necessária."}}),{
       status:401,
-      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://aquipay-api.osamariches.workers.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read listings:read listings:write proposals:read proposals:write credits:read conversations:read"'}
+      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://aquipay-api.osamariches.workers.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read profile:write listings:read listings:write proposals:read proposals:write credits:read conversations:read conversations:write notifications:read notifications:write"'}
     });
   }
   if (message.method==="notifications/initialized" || message.method==="notifications/cancelled") return new Response(null,{status:202,headers});
@@ -280,7 +388,14 @@ export async function handleAquiPayMcp(request,env) {
       aquipay_get_my_credits:"credits:read",
       aquipay_list_my_listings:"listings:read",
       aquipay_list_my_proposals:"proposals:read",
-      aquipay_list_my_conversations:"conversations:read"
+      aquipay_list_my_conversations:"conversations:read",
+      aquipay_get_my_stats:"profile:read",
+      aquipay_update_my_profile:"profile:write",
+      aquipay_list_my_notifications:"notifications:read",
+      aquipay_mark_notifications_read:"notifications:write",
+      aquipay_get_conversation_messages:"conversations:read",
+      aquipay_send_message:"conversations:write",
+      aquipay_get_subscription:"credits:read"
     }[message.params.name];
     if(!requiredScope)return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Ferramenta não encontrada."}),isError:true}});
     if(!user.scopes?.includes(requiredScope))return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Esta ligação não tem permissão para esta operação. Revê as permissões da ligação no AquiPay."}),isError:true}});
