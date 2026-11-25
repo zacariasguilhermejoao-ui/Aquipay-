@@ -482,7 +482,7 @@ async function refreshData(){
     const deletion=await api('/api/me/deletion');
     if(deletion.deletionRequestedAt){S.me.deletionRequestedAt=deletion.deletionRequestedAt;S.me.deletionDueAt=deletion.deletionDueAt;await saveUser(S.me);render();return}
     const [remote,noticeData,usage,accountData,proposalData]=await Promise.all([api('/api/listings'+(S.st.feedCountry==='all'?'':'?country='+encodeURIComponent(S.st.feedCountry||'AO'))),api('/api/notifications'),api('/api/usage'),api('/api/me'),api('/api/proposals')]);
-    S.usage=usage;if(accountData.profile?.country)S.st.profileCountry=accountData.profile.country;if(accountData.profile?.currency)S.st.currency=accountData.profile.currency;S.me.earnings=accountData.earnings||{totalMinor:0,completedCount:0};const self=U(S.me.id);if(self)self.earnings=S.me.earnings;
+    S.usage=usage;if(accountData.profile?.country)S.st.profileCountry=accountData.profile.country;if(accountData.profile?.currency)S.st.currency=accountData.profile.currency;if(!S.st.fx?.[S.st.currency||'AOA']){const rates=await fxRates(S.st.currency||'AOA');if(rates)S.st.fx={...(S.st.fx||{}),[S.st.currency||'AOA']:rates};await put('kv',S.st)}S.me.earnings=accountData.earnings||{totalMinor:0,completedCount:0};const self=U(S.me.id);if(self)self.earnings=S.me.earnings;
     const localCloud=new Map(S.vagas.filter(v=>v.cloudListingId).map(v=>[v.cloudListingId,v]));
     const localOnly=S.vagas.filter(v=>!v.cloudListingId);
     const mapped=(remote.listings||[]).map(row=>{
