@@ -283,7 +283,7 @@ if(p==='/api/oauth/connections'&&m==='GET'){
  const rows=await env.DB.prepare("SELECT c.client_id,c.client_name,t.scopes,MIN(t.created_at) connected_at,MAX(t.last_used_at) last_used_at FROM oauth_tokens t JOIN oauth_clients c ON c.client_id=t.client_id WHERE t.user_id=? AND t.revoked_at IS NULL AND t.refresh_expires_at>? GROUP BY c.client_id,c.client_name,t.scopes ORDER BY connected_at DESC").bind(me.id,new Date().toISOString()).all();
  return out({connections:rows.results||[]});
 }
-const oauthConnection=p.match(/^\\/api\\/oauth\\/connections\\/([a-f0-9-]+)$/i);
+const oauthConnection=p.match(new RegExp("^/api/oauth/connections/([a-f0-9-]+)$","i"));
 if(oauthConnection&&m==='DELETE'){
  const clientId=oauthConnection[1],now=new Date().toISOString();
  await env.DB.batch([
