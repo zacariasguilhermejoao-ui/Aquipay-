@@ -1,3 +1,4 @@
+import { handleOAuthRequest } from "./oauth.js";
 import { handleAquiPayMcp } from "./mcp.js";
 import { handleGooglePlayBilling } from "./google-play-billing.js";
 export { CallRoom } from "./call-room.js";
@@ -278,6 +279,20 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
   return room.fetch(new Request(target,req));
  }
  const me=await current(req,env);if(!me)return err('Sessão inválida ou expirada.',401);
+if(p==='/api/oauth/connections'&&m==='GET'){
+ const rows=await env.DB.prepare("SELECT c.client_id,c.client_name,t.scopes,MIN(t.created_at) connected_at,MAX(t.last_used_at) last_used_at FROM oauth_tokens t JOIN oauth_clients c ON c.client_id=t.client_id WHERE t.user_id=? AND t.revoked_at IS NULL AND t.refresh_expires_at>? GROUP BY c.client_id,c.client_name,t.scopes ORDER BY connected_at DESC").bind(me.id,new Date().toISOString()).all();
+ return out({connections:rows.results||[]});
+}
+const oauthConnection=p.match(/^\\/api\\/oauth\\/connections\\/([a-f0-9-]+)$/i);
+if(oauthConnection&&m==='DELETE'){
+ const clientId=oauthConnection[1],now=new Date().toISOString();
+ await env.DB.batch([
+  env.DB.prepare("UPDATE oauth_tokens SET revoked_at=? WHERE user_id=? AND client_id=? AND revoked_at IS NULL").bind(now,me.id,clientId),
+  env.DB.prepare("DELETE FROM oauth_consents WHERE user_id=? AND client_id=?").bind(me.id,clientId)
+ ]);
+ return out({ok:true});
+}
+
 if(me.deletion_requested_at&&!(p==='/api/me/deletion'&&m==='GET')&&!(p==='/api/me/deletion/cancel'&&m==='POST')&&!(p==='/api/auth/logout'&&m==='POST'))return err('Esta conta está marcada para eliminação. Cancela o pedido para voltar a utilizá-la.',423);
 if(p==='/api/calls/ice'&&m==='GET'){
  if(!env.CALL_TURN_KEY_ID||!env.CALL_TURN_KEY_SECRET)return out({iceServers:[{urls:['stun:stun.cloudflare.com:3478']}]});
@@ -512,4 +527,4 @@ async function purgeExpiredAccounts(env){
   }catch(e){console.error('account purge failed',id,e)}
  }
 }
-export default {async fetch(req,env,ctx){const origin=req.headers.get('origin'),isMcp=new URL(req.url).pathname==='/mcp',allowedList=[env.APP_ORIGIN,...String(env.EXTRA_ORIGINS||'').split(','),...(isMcp?['https://chatgpt.com','https://claude.ai']:[])].map(x=>x.trim()).filter(Boolean),allowed=allowedList.includes(origin)?origin:(env.APP_ORIGIN||''),cors=origin===allowed?{'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','access-control-max-age':'86400','vary':'Origin'}:{};if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});if(origin&&origin!==allowed)return err('Origem não autorizada.',403);try{if(new URL(req.url).pathname==="/mcp"){const mcpResponse=await handleAquiPayMcp(req,env),mcpHeaders=new Headers(mcpResponse.headers);for(const[k,v]of Object.entries(cors))mcpHeaders.set(k,v);return new Response(mcpResponse.body,{status:mcpResponse.status,headers:mcpHeaders});}const r=await api(req,env,ctx),h=new Headers(r.headers);for(const[k,v]of Object.entries(cors))h.set(k,v);h.set('x-content-type-options','nosniff');return r.webSocket?new Response(null,{status:101,webSocket:r.webSocket,headers:h}):new Response(r.body,{status:r.status,headers:h})}catch(e){console.error('Aquipay API',e);return err(e.message==='too_large'?'Pedido demasiado grande.':e instanceof SyntaxError?'JSON inválido.':'Erro interno. Tenta novamente.',e.message==='too_large'?413:500)}},async scheduled(controller,env){const now=new Date().toISOString();await env.DB.prepare('DELETE FROM auth_challenges WHERE expires_at<?').bind(now).run();await env.DB.prepare('DELETE FROM call_tickets WHERE expires_at<?').bind(now).run();await purgeExpiredAccounts(env)}};
+export default {async fetch(req,env,ctx){const origin=req.headers.get('origin'),path=new URL(req.url).pathname,isMcp=path==='/mcp',isOAuth=path.startsWith('/oauth/')||path.startsWith('/.well-known/'),allowedList=[env.APP_ORIGIN,...String(env.EXTRA_ORIGINS||'').split(','),...((isMcp||isOAuth)?['https://chatgpt.com','https://claude.ai','https://claude.com','https://platform.openai.com']:[])].map(x=>x.trim()).filter(Boolean),allowed=allowedList.includes(origin)?origin:(env.APP_ORIGIN||''),cors=origin===allowed?{'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','access-control-max-age':'86400','vary':'Origin'}:{};if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});if(origin&&origin!==allowed)return err('Origem não autorizada.',403);try{const oauthResponse=await handleOAuthRequest(req,env);if(oauthResponse){const oh=new Headers(oauthResponse.headers);for(const[k,v]of Object.entries(cors))oh.set(k,v);return new Response(oauthResponse.body,{status:oauthResponse.status,headers:oh})}if(new URL(req.url).pathname==="/mcp"){const mcpResponse=await handleAquiPayMcp(req,env),mcpHeaders=new Headers(mcpResponse.headers);for(const[k,v]of Object.entries(cors))mcpHeaders.set(k,v);return new Response(mcpResponse.body,{status:mcpResponse.status,headers:mcpHeaders});}const r=await api(req,env,ctx),h=new Headers(r.headers);for(const[k,v]of Object.entries(cors))h.set(k,v);h.set('x-content-type-options','nosniff');return r.webSocket?new Response(null,{status:101,webSocket:r.webSocket,headers:h}):new Response(r.body,{status:r.status,headers:h})}catch(e){console.error('Aquipay API',e);return err(e.message==='too_large'?'Pedido demasiado grande.':e instanceof SyntaxError?'JSON inválido.':'Erro interno. Tenta novamente.',e.message==='too_large'?413:500)}},async scheduled(controller,env){const now=new Date().toISOString();await env.DB.prepare('DELETE FROM auth_challenges WHERE expires_at<?').bind(now).run();await env.DB.prepare('DELETE FROM call_tickets WHERE expires_at<?').bind(now).run();await purgeExpiredAccounts(env)}};
