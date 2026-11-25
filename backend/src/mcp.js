@@ -20,7 +20,7 @@ async function authenticatedUser(request, env) {
   if (!token || token.length > 512) return null;
   const tokenHash=await sha256(token),now=new Date().toISOString();
   const oauth=await env.DB.prepare(
-    "SELECT u.id,u.name,u.email,u.deletion_requested_at,t.scopes FROM oauth_tokens t JOIN users u ON u.id=t.user_id WHERE t.access_hash=? AND t.access_expires_at>? AND t.refresh_expires_at>? AND t.revoked_at IS NULL AND t.resource='https://aquipay-api.osamariches.workers.dev/mcp' AND u.status='active'"
+    "SELECT u.id,u.name,u.email,u.deletion_requested_at,t.scopes FROM oauth_tokens t JOIN users u ON u.id=t.user_id WHERE t.access_hash=? AND t.access_expires_at>? AND t.refresh_expires_at>? AND t.revoked_at IS NULL AND t.resource='https://aquipay-api.osamariches.workers.dev/mcp' AND u.status='active' AND u.deletion_requested_at IS NULL"
   ).bind(tokenHash,now,now).first();
   if(oauth){
     await env.DB.prepare("UPDATE oauth_tokens SET last_used_at=? WHERE access_hash=? AND revoked_at IS NULL").bind(now,tokenHash).run();
