@@ -547,7 +547,7 @@ export async function handleAquiPayMcp(request,env) {
   if(!authenticated){
     return new Response(JSON.stringify({jsonrpc:"2.0",id:message.id??null,error:{code:-32001,message:"Autenticação OAuth necessária."}}),{
       status:401,
-      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://api.aquipay.isabstudio.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read profile:write listings:read listings:write proposals:read proposals:write credits:read conversations:read conversations:write notifications:read notifications:write social:read social:write ratings:read ratings:write safety:read safety:write reports:write documents:read documents:write"'}
+      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://api.aquipay.isabstudio.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read profile:write listings:read listings:write proposals:read proposals:write credits:read conversations:read conversations:write notifications:read notifications:write social:read social:write ratings:read ratings:write safety:read safety:write reports:write documents:read documents:write favorites:read favorites:write"'}
     });
   }
   if (message.method==="notifications/initialized" || message.method==="notifications/cancelled") return new Response(null,{status:202,headers});
