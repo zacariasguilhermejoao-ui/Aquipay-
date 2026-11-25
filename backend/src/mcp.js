@@ -207,6 +207,21 @@ const tools = [
     description:"Elimina um documento profissional próprio do armazenamento e da base de dados. Exige confirm=true.",
     inputSchema:{type:"object",required:["documentId","confirm"],properties:{documentId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
   },
+  {
+    name:"aquipay_list_my_favorites",
+    description:"Lista anúncios ativos que guardaste nos favoritos.",
+    inputSchema:{type:"object",properties:{limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_add_favorite",
+    description:"Guarda um anúncio nos teus favoritos. Exige confirm=true.",
+    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_remove_favorite",
+    description:"Remove um anúncio dos teus favoritos. Exige confirm=true.",
+    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
 ];
 
 async function callTool(name,args,env,user) {
@@ -495,22 +510,6 @@ async function callTool(name,args,env,user) {
     await env.DB.prepare("DELETE FROM documents WHERE id=? AND user_id=?").bind(id,user.id).run();
     return {ok:true,message:"Documento eliminado."};
   }
-
-  {
-    name:"aquipay_list_my_favorites",
-    description:"Lista anúncios ativos que guardaste nos favoritos.",
-    inputSchema:{type:"object",properties:{limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
-  },
-  {
-    name:"aquipay_add_favorite",
-    description:"Guarda um anúncio nos teus favoritos. Exige confirm=true.",
-    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
-  },
-  {
-    name:"aquipay_remove_favorite",
-    description:"Remove um anúncio dos teus favoritos. Exige confirm=true.",
-    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
-  },
 
   if (name==="aquipay_list_my_favorites") {
     const limit=Number.isInteger(args.limit)?Math.max(1,Math.min(100,args.limit)):50;
