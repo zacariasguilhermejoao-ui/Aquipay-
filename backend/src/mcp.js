@@ -24,7 +24,7 @@ async function authenticatedUser(request, env) {
   ).bind(tokenHash,now,now).first();
   if(oauth){
     await env.DB.prepare("UPDATE oauth_tokens SET last_used_at=? WHERE access_hash=? AND revoked_at IS NULL").bind(now,tokenHash).run();
-    return {...oauth,scopes:String(oauth.scopes||"").split(/\\s+/).filter(Boolean)};
+    return {...oauth,scopes:String(oauth.scopes||"").split(/\s+/).filter(Boolean)};
   }
   const session=await env.DB.prepare(
     "SELECT u.id,u.name,u.email,u.deletion_requested_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.status='active'"
@@ -62,6 +62,45 @@ const tools = [
     name:"aquipay_list_my_proposals",
     description:"Consulta propostas enviadas e recebidas pelo utilizador autenticado.",
     inputSchema:{type:"object",properties:{status:{type:"string",enum:["sent","accepted","rejected","withdrawn","completed","cancelled"]},limit:{type:"integer",minimum:1,maximum:50}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_create_listing",
+    description:"Publica um anúncio na conta AquiPay autenticada. Só publica quando confirm=true. Respeita os limites gratuitos e o plano Plus.",
+    inputSchema:{type:"object",required:["kind","title","description","confirm"],properties:{
+      kind:{type:"string",enum:["job","service","product"]},title:{type:"string",minLength:3,maxLength:120},
+      description:{type:"string",minLength:5,maxLength:5000},priceMinor:{type:["integer","null"],minimum:0},
+      currency:{type:"string",pattern:"^[A-Z]{3}$"},city:{type:"string",maxLength:100},country:{type:"string",pattern:"^[A-Z]{2}$"},
+      confirm:{type:"boolean",description:"Tem de ser true para publicar o anúncio."}
+    },additionalProperties:false}
+  },
+  {
+    name:"aquipay_update_my_listing",
+    description:"Edita um anúncio próprio ainda ativo. Só altera quando confirm=true.",
+    inputSchema:{type:"object",required:["listingId","confirm"],properties:{
+      listingId:{type:"string"},title:{type:"string",minLength:3,maxLength:120},description:{type:"string",minLength:5,maxLength:5000},
+      priceMinor:{type:["integer","null"],minimum:0},currency:{type:"string",pattern:"^[A-Z]{3}$"},city:{type:"string",maxLength:100},country:{type:"string",pattern:"^[A-Z]{2}$"},
+      confirm:{type:"boolean"}
+    },additionalProperties:false}
+  },
+  {
+    name:"aquipay_remove_my_listing",
+    description:"Remove um anúncio próprio e cancela propostas ainda abertas. Exige confirm=true.",
+    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_send_proposal",
+    description:"Envia uma candidatura/proposta para um anúncio ativo de outra pessoa. Exige confirm=true e respeita limites diários.",
+    inputSchema:{type:"object",required:["listingId","message","confirm"],properties:{
+      listingId:{type:"string"},message:{type:"string",minLength:10,maxLength:4000},priceMinor:{type:["integer","null"],minimum:0},
+      deliveryDays:{type:"integer",minimum:1,maximum:365},confirm:{type:"boolean"}
+    },additionalProperties:false}
+  },
+  {
+    name:"aquipay_update_proposal_status",
+    description:"Aceita, recusa ou marca como concluída uma proposta conforme as regras de autorização do AquiPay. Exige confirm=true.",
+    inputSchema:{type:"object",required:["proposalId","status","confirm"],properties:{
+      proposalId:{type:"string"},status:{type:"string",enum:["accepted","rejected","completed"]},confirm:{type:"boolean"}
+    },additionalProperties:false}
   },
   {
     name:"aquipay_list_my_conversations",
@@ -106,6 +145,90 @@ async function callTool(name,args,env,user) {
     ).bind(user.id,user.id,user.id,status,status,limit).all();
     return {proposals:rows.results||[]};
   }
+  if (name==="aquipay_create_listing") {
+    if(args.confirm!==true) throw new Error("Publicação não executada. Confirma explicitamente definindo confirm=true.");
+    const kind=args.kind,title=typeof args.title==="string"?args.title.trim(): "",description=typeof args.description==="string"?args.description.trim():"";
+    const price=args.priceMinor===undefined||args.priceMinor===null?null:args.priceMinor;
+    if(!["job","service","product"].includes(kind)||title.length<3||title.length>120||description.length<5||description.length>5000||(price!==null&&(!Number.isSafeInteger(price)||price<0)))throw new Error("Dados do anúncio inválidos.");
+    const country=typeof args.country==="string"&&/^[A-Z]{2}$/.test(args.country.toUpperCase())?args.country.toUpperCase():"AO";
+    const currency=typeof args.currency==="string"&&/^[A-Z]{3}$/.test(args.currency.toUpperCase())?args.currency.toUpperCase():"AOA";
+    const city=typeof args.city==="string"?args.city.trim().slice(0,100):"";
+    const plus=await env.DB.prepare("SELECT 1 ok FROM user_subscriptions WHERE user_id=? AND status='active' AND expires_at>? LIMIT 1").bind(user.id,new Date().toISOString()).first();
+    const monthParts=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Luanda",year:"numeric",month:"2-digit"}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+    const monthStart=new Date(`${monthParts.year}-${monthParts.month}-01T00:00:00+01:00`).toISOString();
+    const id=crypto.randomUUID();
+    let inserted;
+    if(plus) inserted=await env.DB.prepare("INSERT INTO listings(id,owner_id,kind,title,description,price_minor,currency,city,country) VALUES(?,?,?,?,?,?,?,?,?) RETURNING id").bind(id,user.id,kind,title,description,price,currency,city,country).first();
+    else inserted=await env.DB.prepare("INSERT INTO listings(id,owner_id,kind,title,description,price_minor,currency,city,country) SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM listings WHERE owner_id=? AND created_at>=?)<10 RETURNING id").bind(id,user.id,kind,title,description,price,currency,city,country,user.id,monthStart).first();
+    if(!inserted)throw new Error("Atingiste os 10 anúncios gratuitos deste mês. Ativa o Plus para publicar sem limite.");
+    return {ok:true,listingId:id,status:"active",plusActive:!!plus,message:"Anúncio publicado com sucesso."};
+  }
+  if (name==="aquipay_update_my_listing") {
+    if(args.confirm!==true) throw new Error("Edição não executada. Define confirm=true.");
+    const id=String(args.listingId||"").trim();
+    const old=await env.DB.prepare("SELECT id,title,description,price_minor,currency,city,country FROM listings WHERE id=? AND owner_id=? AND status='active'").bind(id,user.id).first();
+    if(!old)throw new Error("Anúncio ativo não encontrado na tua conta.");
+    const title=args.title===undefined?old.title:String(args.title).trim();
+    const description=args.description===undefined?old.description:String(args.description).trim();
+    const price=args.priceMinor===undefined?old.price_minor:args.priceMinor;
+    const currency=args.currency===undefined?old.currency:String(args.currency).toUpperCase();
+    const city=args.city===undefined?old.city:String(args.city).trim().slice(0,100);
+    const country=args.country===undefined?old.country:String(args.country).toUpperCase();
+    if(title.length<3||title.length>120||description.length<5||description.length>5000||(price!==null&&(!Number.isSafeInteger(price)||price<0))||!/^[A-Z]{3}$/.test(currency)||!/^[A-Z]{2}$/.test(country))throw new Error("Os dados enviados não são válidos.");
+    await env.DB.prepare("UPDATE listings SET title=?,description=?,price_minor=?,currency=?,city=?,country=?,updated_at=? WHERE id=? AND owner_id=? AND status='active'").bind(title,description,price,currency,city,country,new Date().toISOString(),id,user.id).run();
+    return {ok:true,listingId:id,message:"Anúncio atualizado."};
+  }
+  if (name==="aquipay_remove_my_listing") {
+    if(args.confirm!==true) throw new Error("Remoção não executada. Define confirm=true.");
+    const id=String(args.listingId||"").trim(),item=await env.DB.prepare("SELECT id FROM listings WHERE id=? AND owner_id=? AND status='active'").bind(id,user.id).first();
+    if(!item)throw new Error("Anúncio ativo não encontrado na tua conta.");
+    const now=new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE listings SET status='removed',updated_at=? WHERE id=? AND owner_id=?").bind(now,id,user.id),
+      env.DB.prepare("UPDATE proposals SET status='cancelled',updated_at=? WHERE listing_id=? AND status IN ('sent','accepted')").bind(now,id)
+    ]);
+    return {ok:true,listingId:id,status:"removed",message:"Anúncio removido; propostas abertas canceladas."};
+  }
+  if (name==="aquipay_send_proposal") {
+    if(args.confirm!==true) throw new Error("Envio não executado. Define confirm=true para confirmar a candidatura.");
+    const listingId=String(args.listingId||"").trim(),message=typeof args.message==="string"?args.message.trim():"";
+    const price=args.priceMinor===undefined||args.priceMinor===null?null:args.priceMinor;
+    if(message.length<10||message.length>4000||(price!==null&&(!Number.isSafeInteger(price)||price<0)))throw new Error("Dados da proposta inválidos.");
+    const listing=await env.DB.prepare("SELECT l.id,l.owner_id,l.title,l.currency FROM listings l JOIN users u ON u.id=l.owner_id WHERE l.id=? AND l.status='active' AND u.status='active' AND u.deletion_requested_at IS NULL").bind(listingId).first();
+    if(!listing||listing.owner_id===user.id)throw new Error("Anúncio indisponível para candidatura.");
+    if(await env.DB.prepare("SELECT 1 ok FROM proposals WHERE listing_id=? AND status='accepted' LIMIT 1").bind(listingId).first())throw new Error("Este anúncio já está negociado e não aceita novas propostas.");
+    if(await env.DB.prepare("SELECT 1 ok FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)").bind(user.id,listing.owner_id,listing.owner_id,user.id).first())throw new Error("Não é possível enviar propostas a este utilizador.");
+    const plus=await env.DB.prepare("SELECT 1 ok FROM user_subscriptions WHERE user_id=? AND status='active' AND expires_at>? LIMIT 1").bind(user.id,new Date().toISOString()).first();
+    const dateParts=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Luanda",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+    const dayStart=new Date(`${dateParts.year}-${dateParts.month}-${dateParts.day}T00:00:00+01:00`).toISOString();
+    const proposalId=crypto.randomUUID(),conversationId=crypto.randomUUID(),delivery=Number.isInteger(args.deliveryDays)?Math.max(1,Math.min(365,args.deliveryDays)):null;
+    let inserted;
+    if(plus)inserted=await env.DB.prepare("INSERT INTO proposals(id,listing_id,sender_id,receiver_id,message,price_minor,currency,delivery_days) VALUES(?,?,?,?,?,?,?,?) RETURNING id").bind(proposalId,listingId,user.id,listing.owner_id,message,price,listing.currency||"AOA",delivery).first();
+    else inserted=await env.DB.prepare("INSERT INTO proposals(id,listing_id,sender_id,receiver_id,message,price_minor,currency,delivery_days) SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM proposals WHERE sender_id=? AND created_at>=?)<5 RETURNING id").bind(proposalId,listingId,user.id,listing.owner_id,message,price,listing.currency||"AOA",delivery,user.id,dayStart).first();
+    if(!inserted)throw new Error("Atingiste as 5 candidaturas gratuitas de hoje. Volta amanhã ou ativa o Plus.");
+    await env.DB.prepare("INSERT INTO conversations(id,proposal_id,participant_a,participant_b) VALUES(?,?,?,?)").bind(conversationId,proposalId,user.id,listing.owner_id).run();
+    await env.DB.prepare("INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),listing.owner_id,"proposal","Nova proposta","Foi recebida uma nova proposta para «"+listing.title+"».",JSON.stringify({proposalId,conversationId,url:"/?conversation="+encodeURIComponent(conversationId)})).run();
+    return {ok:true,proposalId,conversationId,status:"sent",plusActive:!!plus,message:"Proposta enviada com sucesso."};
+  }
+  if (name==="aquipay_update_proposal_status") {
+    if(args.confirm!==true) throw new Error("Alteração não executada. Define confirm=true.");
+    const id=String(args.proposalId||"").trim(),status=args.status;
+    if(!["accepted","rejected","completed"].includes(status))throw new Error("Estado de proposta inválido.");
+    const p=await env.DB.prepare("SELECT p.id,p.listing_id,p.sender_id,p.receiver_id,p.status,c.id conversation_id,l.kind listing_kind,l.owner_id listing_owner_id,l.title listing_title FROM proposals p JOIN listings l ON l.id=p.listing_id LEFT JOIN conversations c ON c.proposal_id=p.id WHERE p.id=?").bind(id).first();
+    if(!p)throw new Error("Proposta não encontrada.");
+    const receiver=p.receiver_id===user.id,sender=p.sender_id===user.id;
+    if(status==="accepted"||status==="rejected"){
+      if(!receiver||p.status!=="sent")throw new Error("Só o proprietário do anúncio pode aceitar ou recusar uma proposta pendente.");
+    }else{
+      const clientId=p.listing_kind==="job"?p.listing_owner_id:p.sender_id;
+      if(!(receiver||sender)||user.id!==clientId||p.status!=="accepted")throw new Error("Só o cliente pode confirmar a conclusão de uma proposta aceite.");
+    }
+    const changed=await env.DB.prepare("UPDATE proposals SET status=?,updated_at=? WHERE id=? AND status=?").bind(status,new Date().toISOString(),id,p.status).run();
+    if(!changed.meta?.changes)throw new Error("A proposta já foi alterada. Atualiza a lista e tenta novamente.");
+    const recipient=receiver?p.sender_id:p.receiver_id;
+    await env.DB.prepare("INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),recipient,"proposal_status","Atualização da proposta",status==="accepted"?"A tua proposta foi aceite.":status==="rejected"?"A tua proposta foi recusada.":"A proposta foi marcada como concluída.",JSON.stringify({proposalId:id,status,conversationId:p.conversation_id})).run();
+    return {ok:true,proposalId:id,status,message:"Estado da proposta atualizado."};
+  }
   if (name==="aquipay_list_my_conversations") {
     const rows=await env.DB.prepare(
       "SELECT c.id,c.proposal_id,c.created_at,CASE WHEN c.participant_a=? THEN u2.name ELSE u1.name END other_user_name,(SELECT m.body FROM messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) last_message,(SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.sender_id<>? AND m.read_at IS NULL) unread_count FROM conversations c JOIN users u1 ON u1.id=c.participant_a JOIN users u2 ON u2.id=c.participant_b WHERE (c.participant_a=? OR c.participant_b=?) ORDER BY c.created_at DESC LIMIT 50"
@@ -129,7 +252,7 @@ export async function handleAquiPayMcp(request,env) {
   if(!authenticated){
     return new Response(JSON.stringify({jsonrpc:"2.0",id:message.id??null,error:{code:-32001,message:"Autenticação OAuth necessária."}}),{
       status:401,
-      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://aquipay-api.osamariches.workers.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read listings:read proposals:read credits:read conversations:read"'}
+      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://aquipay-api.osamariches.workers.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read listings:read listings:write proposals:read proposals:write credits:read conversations:read"'}
     });
   }
   if (message.method==="notifications/initialized" || message.method==="notifications/cancelled") return new Response(null,{status:202,headers});
@@ -139,7 +262,7 @@ export async function handleAquiPayMcp(request,env) {
       protocolVersion:"2025-06-18",
       capabilities:{tools:{listChanged:false}},
       serverInfo:{name:"aquipay-mcp",version:"1.0.0"},
-      instructions:"Conector oficial do AquiPay. As ferramentas só consultam dados da conta autenticada. Não tente executar operações financeiras: créditos são virtuais."
+      instructions:"Conector oficial do AquiPay. As ferramentas de escrita só executam ações da conta autenticada quando confirm=true. Nunca realize compras, gastos de créditos ou operações financeiras; os créditos são virtuais."
     }});
   }
   if (message.method==="tools/list") return response({jsonrpc:"2.0",id:message.id,result:{tools}});
@@ -148,6 +271,11 @@ export async function handleAquiPayMcp(request,env) {
     if (!message.params || typeof message.params.name!=="string") return rpcError(message.id,-32602,"Ferramenta inválida.");
     const requiredScope={
       aquipay_search_listings:"listings:read",
+      aquipay_create_listing:"listings:write",
+      aquipay_update_my_listing:"listings:write",
+      aquipay_remove_my_listing:"listings:write",
+      aquipay_send_proposal:"proposals:write",
+      aquipay_update_proposal_status:"proposals:write",
       aquipay_get_my_profile:"profile:read",
       aquipay_get_my_credits:"credits:read",
       aquipay_list_my_listings:"listings:read",
