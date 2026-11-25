@@ -18,9 +18,18 @@ async function authenticatedUser(request, env) {
   const auth=request.headers.get("authorization") || "";
   const token=auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token || token.length > 512) return null;
-  return env.DB.prepare(
+  const tokenHash=await sha256(token),now=new Date().toISOString();
+  const oauth=await env.DB.prepare(
+    "SELECT u.id,u.name,u.email,u.deletion_requested_at,t.scopes FROM oauth_tokens t JOIN users u ON u.id=t.user_id WHERE t.access_hash=? AND t.access_expires_at>? AND t.refresh_expires_at>? AND t.revoked_at IS NULL AND u.status='active'"
+  ).bind(tokenHash,now,now).first();
+  if(oauth){
+    await env.DB.prepare("UPDATE oauth_tokens SET last_used_at=? WHERE access_hash=? AND revoked_at IS NULL").bind(now,tokenHash).run();
+    return {...oauth,scopes:String(oauth.scopes||"").split(/\\s+/).filter(Boolean)};
+  }
+  const session=await env.DB.prepare(
     "SELECT u.id,u.name,u.email,u.deletion_requested_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.status='active'"
-  ).bind(await sha256(token), new Date().toISOString()).first();
+  ).bind(tokenHash,now).first();
+  return session?{...session,scopes:["profile:read","listings:read","proposals:read","credits:read","conversations:read"]}:null;
 }
 
 const tools = [
@@ -131,6 +140,16 @@ export async function handleAquiPayMcp(request,env) {
     const user=await authenticatedUser(request,env);
     if (!user) return rpcError(message.id,-32001,"Autenticação necessária. Envia Authorization: Bearer <token de sessão AquiPay>.");
     if (!message.params || typeof message.params.name!=="string") return rpcError(message.id,-32602,"Ferramenta inválida.");
+    const requiredScope={
+      aquipay_search_listings:"listings:read",
+      aquipay_get_my_profile:"profile:read",
+      aquipay_get_my_credits:"credits:read",
+      aquipay_list_my_listings:"listings:read",
+      aquipay_list_my_proposals:"proposals:read",
+      aquipay_list_my_conversations:"conversations:read"
+    }[message.params.name];
+    if(!requiredScope)return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Ferramenta não encontrada."}),isError:true}});
+    if(!user.scopes?.includes(requiredScope))return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Esta ligação não tem permissão para esta operação. Revê as permissões da ligação no AquiPay."}),isError:true}});
     try {
       const result=await callTool(message.params.name,message.params.arguments||{},env,user);
       return response({jsonrpc:"2.0",id:message.id,result:textResult(result)});
