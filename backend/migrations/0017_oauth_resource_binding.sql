@@ -1,0 +1,2 @@
+ALTER TABLE oauth_codes ADD COLUMN resource TEXT NOT NULL DEFAULT 'https://aquipay-api.osamariches.workers.dev/mcp';
+ALTER TABLE oauth_tokens ADD COLUMN resource TEXT NOT NULL DEFAULT 'https://aquipay-api.osamariches.workers.dev/mcp';
