@@ -43,7 +43,7 @@ async function authorizePost(req,env){
  const form=await req.formData(),v=k=>String(form.get(k)||"");
  const clientId=v("client_id"),redirectUri=v("redirect_uri"),challenge=v("code_challenge"),state=v("state"),decision=v("decision"),resource=v("resource");
  const client=await getClient(env,clientId);let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
- if(!client||!redirects.includes(redirectUri)||!state||state.length>512||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge))return formPage("Pedido inválido","<p class='error'>O pedido de autorização não é válido. Fecha esta página e tenta ligar novamente.</p>");
+ if(!client||!redirects.includes(redirectUri)||!state||state.length>512||resource!=="https://aquipay-api.osamariches.workers.dev/mcp"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge))return formPage("Pedido inválido","<p class='error'>O pedido de autorização não é válido. Fecha esta página e tenta ligar novamente.</p>");
  if(decision!=="approve")return redirectWith(redirectUri,{error:"access_denied",error_description:"O utilizador recusou o acesso.",state});
  const requested=scopesParse(v("scope")),approved=scopesParse(form.getAll("approved_scope").join(" "));
  if(!requested.length||requested.some(s=>!OAUTH_SCOPES.includes(s))||approved.some(s=>!requested.includes(s))||!approved.length)return formPage("Permissões inválidas","<p class='error'>Seleciona pelo menos uma permissão válida.</p>");
