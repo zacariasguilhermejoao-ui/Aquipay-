@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   plugins: {
     SocialLogin: { providers: { google: true, facebook: false, apple: false, twitter: false } },
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 2000,
       launchAutoHide: true,
       backgroundColor: '#000000',
       showSpinner: false,
