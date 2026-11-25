@@ -16,9 +16,9 @@ async function accessToken(env){
  const d=await r.json().catch(()=>({}));if(!r.ok||!d.access_token)return null;
  cachedAccessToken=d.access_token;cachedUntil=Date.now()+Number(d.expires_in||3600)*1000;return cachedAccessToken;
 }
-async function googleRequest(env,path,method="GET"){
+async function googleRequest(env,path,method="GET",body){
  const token=await accessToken(env);if(!token)throw new Error("google_play_not_configured");
- const r=await fetch("https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"+encodeURIComponent(env.GOOGLE_PLAY_PACKAGE_NAME||"com.aquipay.isabstudio")+path,{method,headers:{authorization:"Bearer "+token,"content-type":"application/json"}});
+ const r=await fetch("https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"+encodeURIComponent(env.GOOGLE_PLAY_PACKAGE_NAME||"com.aquipay.isabstudio")+path,{method,headers:{authorization:"Bearer "+token,"content-type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error("google_play_api_"+r.status);return d;
 }
 function coinCatalog(env){try{const x=JSON.parse(env.GOOGLE_PLAY_COIN_PRODUCTS||"{}");return x&&typeof x==="object"?x:{}}catch{return {}}}
@@ -72,7 +72,7 @@ export async function handleGooglePlayBilling(req,env,me){
  }
  await env.DB.prepare("INSERT INTO user_subscriptions(user_id,product_id,status,expires_at,updated_at) VALUES(?,?,'active',?,?) ON CONFLICT(user_id) DO UPDATE SET product_id=excluded.product_id,status='active',expires_at=MAX(user_subscriptions.expires_at,excluded.expires_at),updated_at=excluded.updated_at").bind(me.id,plusProduct,expiresAt,now).run();
  if(sub.acknowledgementState!=="ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"){
-  try{await googleRequest(env,"/purchases/subscriptionsv2/tokens/"+encodeURIComponent(purchaseToken)+":acknowledge","POST");await env.DB.prepare("UPDATE google_play_purchases SET acknowledged=1,updated_at=? WHERE purchase_token_hash=?").bind(now,tokenHash).run()}catch(e){console.error("Google Play subscription acknowledge pending",e.message)}
+  try{await googleRequest(env,"/purchases/subscriptions/"+encodeURIComponent(plusProduct)+"/tokens/"+encodeURIComponent(purchaseToken)+":acknowledge","POST",{});await env.DB.prepare("UPDATE google_play_purchases SET acknowledged=1,updated_at=? WHERE purchase_token_hash=?").bind(now,tokenHash).run()}catch(e){console.error("Google Play subscription acknowledge pending",e.message)}
  }
  return response({ok:true,plusActive:true,expiresAt});
 }
