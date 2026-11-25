@@ -125,6 +125,13 @@ export async function handleAquiPayMcp(request,env) {
   let message;
   try { message=JSON.parse(raw); } catch { return rpcError(null,-32700,"JSON inválido."); }
   if (!message || message.jsonrpc!=="2.0" || typeof message.method!=="string") return rpcError(message?.id,-32600,"Pedido JSON-RPC inválido.");
+  const authenticated=await authenticatedUser(request,env);
+  if(!authenticated){
+    return new Response(JSON.stringify({jsonrpc:"2.0",id:message.id??null,error:{code:-32001,message:"Autenticação OAuth necessária."}}),{
+      status:401,
+      headers:{...headers,"www-authenticate":'Bearer resource_metadata="https://aquipay-api.osamariches.workers.dev/.well-known/oauth-protected-resource/mcp", scope="profile:read listings:read proposals:read credits:read conversations:read"'}
+    });
+  }
   if (message.method==="notifications/initialized" || message.method==="notifications/cancelled") return new Response(null,{status:202,headers});
   if (message.method==="ping") return response({jsonrpc:"2.0",id:message.id??null,result:{}});
   if (message.method==="initialize") {
@@ -137,8 +144,7 @@ export async function handleAquiPayMcp(request,env) {
   }
   if (message.method==="tools/list") return response({jsonrpc:"2.0",id:message.id,result:{tools}});
   if (message.method==="tools/call") {
-    const user=await authenticatedUser(request,env);
-    if (!user) return rpcError(message.id,-32001,"Autenticação necessária. Envia Authorization: Bearer <token de sessão AquiPay>.");
+    const user=authenticated;
     if (!message.params || typeof message.params.name!=="string") return rpcError(message.id,-32602,"Ferramenta inválida.");
     const requiredScope={
       aquipay_search_listings:"listings:read",
