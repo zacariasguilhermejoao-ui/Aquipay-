@@ -93,6 +93,7 @@ jobs:
                   registerPlugin(ShareReceiverPlugin.class);
                   registerPlugin(AquiPayReviewPlugin.class);
                   super.onCreate(savedInstanceState);
+                  dispatchSharedIntent(getIntent());
                   dispatchAppLink(getIntent());
               }
 
@@ -481,7 +482,7 @@ jobs:
           print("Configured minSdkVersion=24, compileSdkVersion=36, targetSdkVersion=36, Android Gradle Plugin 8.9.1 and Gradle 8.11.1.")
           PY
 
-      - name: Set AquiPay release version (4 / 1.0.3)
+      - name: Set AquiPay release version (5 / 1.0.4)
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -490,15 +491,15 @@ jobs:
           gradle = Path("android/app/build.gradle")
           source = gradle.read_text(encoding="utf-8")
           patterns = [
-              (r"(?m)^(\s*versionCode\s*=?\s*)\d+(\s*(?://.*)?)$", r"\g<1>4\g<2>", "versionCode"),
-              (r'(?m)^(\s*versionName\s*=?\s*).+$', r'\g<1>"1.0.3"', "versionName"),
+              (r"(?m)^(\s*versionCode\s*=?\s*)\d+(\s*(?://.*)?)$", r"\g<1>5\g<2>", "versionCode"),
+              (r'(?m)^(\s*versionName\s*=?\s*).+$', r'\g<1>"1.0.4"', "versionName"),
           ]
           for pattern, replacement, label in patterns:
               source, count = re.subn(pattern, replacement, source)
               if count != 1:
                   raise SystemExit(f"Expected exactly one {label} setting in android/app/build.gradle; found {count}.")
           gradle.write_text(source, encoding="utf-8")
-          print("AquiPay Android version set to versionCode 4 and versionName 1.0.3.")
+          print("AquiPay Android version set to versionCode 5 and versionName 1.0.4.")
           PY
 
       - name: Resolve AndroidX Browser dependency conflict
