@@ -29,9 +29,9 @@ async function googleClaims(credential,clientId){
  return claims;
 }
 async function authorizeGet(req,env){
- const u=new URL(req.url),clientId=u.searchParams.get("client_id")||"",redirectUri=u.searchParams.get("redirect_uri")||"",challenge=u.searchParams.get("code_challenge")||"",method=u.searchParams.get("code_challenge_method")||"",state=u.searchParams.get("state")||"",responseType=u.searchParams.get("response_type")||"",resource=u.searchParams.get("resource")||"https://aquipay-api.osamariches.workers.dev/mcp";
+ const u=new URL(req.url),clientId=u.searchParams.get("client_id")||"",redirectUri=u.searchParams.get("redirect_uri")||"",challenge=u.searchParams.get("code_challenge")||"",method=u.searchParams.get("code_challenge_method")||"",state=u.searchParams.get("state")||"",responseType=u.searchParams.get("response_type")||"",resource=u.searchParams.get("resource")||"https://api.aquipay.isabstudio.dev/mcp";
  const client=await getClient(env,clientId);let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
- if(!client||!redirects.includes(redirectUri)||responseType!=="code"||method!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)||!state||state.length>512||resource!=="https://aquipay-api.osamariches.workers.dev/mcp")return formPage("Pedido inválido","<p class='error'>O pedido de autorização é inválido ou expirou. Volta à aplicação de IA e tenta novamente.</p>");
+ if(!client||!redirects.includes(redirectUri)||responseType!=="code"||method!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)||!state||state.length>512||resource!=="https://api.aquipay.isabstudio.dev/mcp")return formPage("Pedido inválido","<p class='error'>O pedido de autorização é inválido ou expirou. Volta à aplicação de IA e tenta novamente.</p>");
  const requested=scopesParse(u.searchParams.get("scope")||OAUTH_SCOPES.join(" "));if(!requested.length||requested.some(s=>!OAUTH_SCOPES.includes(s)))return formPage("Permissões inválidas","<p class='error'>A aplicação pediu permissões não suportadas.</p>");
  const hidden=(k,v)=>`<input type="hidden" name="${k}" value="${htmlEscape(v)}">`;
  const fields=hidden("client_id",clientId)+hidden("redirect_uri",redirectUri)+hidden("code_challenge",challenge)+hidden("code_challenge_method","S256")+hidden("state",state)+hidden("scope",requested.join(" "))+hidden("resource",resource);
@@ -43,7 +43,7 @@ async function authorizePost(req,env){
  const form=await req.formData(),v=k=>String(form.get(k)||"");
  const clientId=v("client_id"),redirectUri=v("redirect_uri"),challenge=v("code_challenge"),state=v("state"),decision=v("decision"),resource=v("resource");
  const client=await getClient(env,clientId);let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
- if(!client||!redirects.includes(redirectUri)||!state||state.length>512||resource!=="https://aquipay-api.osamariches.workers.dev/mcp"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge))return formPage("Pedido inválido","<p class='error'>O pedido de autorização não é válido. Fecha esta página e tenta ligar novamente.</p>");
+ if(!client||!redirects.includes(redirectUri)||!state||state.length>512||resource!=="https://api.aquipay.isabstudio.dev/mcp"||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge))return formPage("Pedido inválido","<p class='error'>O pedido de autorização não é válido. Fecha esta página e tenta ligar novamente.</p>");
  if(decision!=="approve")return redirectWith(redirectUri,{error:"access_denied",error_description:"O utilizador recusou o acesso.",state});
  const requested=scopesParse(v("scope")),approved=scopesParse(form.getAll("approved_scope").join(" "));
  if(!requested.length||requested.some(s=>!OAUTH_SCOPES.includes(s))||approved.some(s=>!requested.includes(s))||!approved.length)return formPage("Permissões inválidas","<p class='error'>Seleciona pelo menos uma permissão válida.</p>");
@@ -80,7 +80,7 @@ async function tokenPost(req,env){
  if(!clientId)return json({error:"invalid_client"},401);
  const client=await getClient(env,clientId);if(!client)return json({error:"invalid_client"},401);
  if(grant==="authorization_code"){
-  const code=form.get("code")||"",redirectUri=form.get("redirect_uri")||"",verifier=form.get("code_verifier")||"",resource=form.get("resource")||"https://aquipay-api.osamariches.workers.dev/mcp";
+  const code=form.get("code")||"",redirectUri=form.get("redirect_uri")||"",verifier=form.get("code_verifier")||"",resource=form.get("resource")||"https://api.aquipay.isabstudio.dev/mcp";
   if(!code||!verifier||verifier.length<43||verifier.length>128)return json({error:"invalid_grant"});
   const row=await env.DB.prepare("SELECT * FROM oauth_codes WHERE code_hash=? AND client_id=? AND redirect_uri=? AND resource=? AND expires_at>?").bind(await hash(code),clientId,redirectUri,resource,new Date().toISOString()).first();
   if(!row)return json({error:"invalid_grant"});
@@ -93,7 +93,7 @@ async function tokenPost(req,env){
   return json({access_token:access,token_type:"Bearer",expires_in:900,refresh_token:refresh,scope:row.scopes});
  }
  if(grant==="refresh_token"){
-  const refresh=form.get("refresh_token")||"",resource=form.get("resource")||"https://aquipay-api.osamariches.workers.dev/mcp",row=await env.DB.prepare("SELECT * FROM oauth_tokens WHERE refresh_hash=? AND client_id=? AND resource=? AND revoked_at IS NULL AND refresh_expires_at>?").bind(await hash(refresh),clientId,resource,new Date().toISOString()).first();
+  const refresh=form.get("refresh_token")||"",resource=form.get("resource")||"https://api.aquipay.isabstudio.dev/mcp",row=await env.DB.prepare("SELECT * FROM oauth_tokens WHERE refresh_hash=? AND client_id=? AND resource=? AND revoked_at IS NULL AND refresh_expires_at>?").bind(await hash(refresh),clientId,resource,new Date().toISOString()).first();
   if(!row)return json({error:"invalid_grant"});
   const access=rand(),nextRefresh=rand(),accessExpiry=new Date(Date.now()+900000).toISOString(),refreshExpiry=new Date(Date.now()+30*86400000).toISOString();
   const changed=await env.DB.prepare("UPDATE oauth_tokens SET access_hash=?,refresh_hash=?,access_expires_at=?,refresh_expires_at=?,last_used_at=? WHERE id=? AND refresh_hash=? AND revoked_at IS NULL").bind(await hash(access),await hash(nextRefresh),accessExpiry,refreshExpiry,new Date().toISOString(),row.id,await hash(refresh)).run();
@@ -110,15 +110,15 @@ async function revokePost(req,env){
 export async function handleOAuthRequest(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
  if(p==="/.well-known/oauth-authorization-server"&&m==="GET")return json({
-  issuer:"https://aquipay-api.osamariches.workers.dev",
-  authorization_endpoint:"https://aquipay-api.osamariches.workers.dev/oauth/authorize",
-  token_endpoint:"https://aquipay-api.osamariches.workers.dev/oauth/token",
-  registration_endpoint:"https://aquipay-api.osamariches.workers.dev/oauth/register",
-  revocation_endpoint:"https://aquipay-api.osamariches.workers.dev/oauth/revoke",
+  issuer:"https://api.aquipay.isabstudio.dev",
+  authorization_endpoint:"https://api.aquipay.isabstudio.dev/oauth/authorize",
+  token_endpoint:"https://api.aquipay.isabstudio.dev/oauth/token",
+  registration_endpoint:"https://api.aquipay.isabstudio.dev/oauth/register",
+  revocation_endpoint:"https://api.aquipay.isabstudio.dev/oauth/revoke",
   response_types_supported:["code"],response_modes_supported:["query"],grant_types_supported:["authorization_code","refresh_token"],
   token_endpoint_auth_methods_supported:["none"],code_challenge_methods_supported:["S256"],scopes_supported:OAUTH_SCOPES
  });
- if(p==="/.well-known/oauth-protected-resource"||p==="/.well-known/oauth-protected-resource/mcp")return json({resource:"https://aquipay-api.osamariches.workers.dev/mcp",authorization_servers:["https://aquipay-api.osamariches.workers.dev"],scopes_supported:OAUTH_SCOPES,bearer_methods_supported:["header"]});
+ if(p==="/.well-known/oauth-protected-resource"||p==="/.well-known/oauth-protected-resource/mcp")return json({resource:"https://api.aquipay.isabstudio.dev/mcp",authorization_servers:["https://api.aquipay.isabstudio.dev"],scopes_supported:OAUTH_SCOPES,bearer_methods_supported:["header"]});
  if(p==="/oauth/register"&&m==="POST"){
   const ip=req.headers.get("cf-connecting-ip")||"unknown",key="oauth_register:"+ip+":"+Math.floor(Date.now()/3600000);
   const rate=await env.DB.prepare("INSERT INTO rate_limits(k,n,exp) VALUES(?,1,?) ON CONFLICT(k) DO UPDATE SET n=n+1 RETURNING n").bind(key,Date.now()+7200000).first();
