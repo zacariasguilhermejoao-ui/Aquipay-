@@ -10,8 +10,10 @@
     "EXTRA_ORIGINS": "https://jolly-base-3c89.osamariches.workers.dev,https://localhost,capacitor://localhost,http://localhost",
     "MAIL_FROM": "no-reply@isabstudio.dev",
     "GOOGLE_PLAY_PACKAGE_NAME": "com.aquipay.isabstudio",
-    "GOOGLE_PLAY_COIN_PRODUCTS": "{\"coins_10\":{\"coins\":10,\"bonus\":0},\"coins_50\":{\"coins\":50,\"bonus\":0},\"coins_110\":{\"coins\":100,\"bonus\":10},\"coins_240\":{\"coins\":200,\"bonus\":40},\"coins_650\":{\"coins\":500,\"bonus\":150}}",
-    "VAPID_PUBLIC_KEY": "BH-wW8rBNSru4t4iAiHetwaqYhLpaq59JitYbwYEpYzk9bc4W9vy25QxwFCn5bjlQ12PaO15ufvQS7ivcU_4D6g"
+    "GOOGLE_PLAY_COIN_PRODUCTS": "{\"aquipay_coins_10\":{\"coins\":10,\"bonus\":0},\"aquipay_coins_50\":{\"coins\":50,\"bonus\":0},\"aquipay_coins_110\":{\"coins\":100,\"bonus\":10},\"aquipay_coins_240\":{\"coins\":200,\"bonus\":40},\"aquipay_coins_650\":{\"coins\":500,\"bonus\":150}}",
+    "VAPID_PUBLIC_KEY": "BH-wW8rBNSru4t4iAiHetwaqYhLpaq59JitYbwYEpYzk9bc4W9vy25QxwFCn5bjlQ12PaO15ufvQS7ivcU_4D6g",
+    "GOOGLE_PLAY_PLUS_PRODUCT_ID": "aquipay_plus_monthly",
+    "GOOGLE_PLAY_PLUS_BASE_PLAN_ID": "monthly"
   },
   "d1_databases": [
     {
