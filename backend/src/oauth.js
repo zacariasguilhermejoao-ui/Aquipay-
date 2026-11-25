@@ -62,6 +62,7 @@ async function authorizePost(req,env){
    user=await env.DB.prepare("SELECT id,name,email,password_hash,password_salt,status,deletion_requested_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE email=?").bind(email).first();
    if(!user||user.status!=="active"||user.deletion_requested_at||!password||await passHash(password,user.password_salt)!==user.password_hash)return formPage("Não foi possível autorizar","<p class='error'>Email ou palavra-passe incorretos, ou conta indisponível. Volta a tentar.</p>");
  }
+ if(!user||user.status!=="active"||user.deletion_requested_at)return formPage("Conta indisponível","<p class=\"error\">Não foi encontrada uma conta ativa com estes dados. Cria primeiro a tua conta no AquiPay.</p>");
  if(user.totp_enabled){
    let ok=false;try{const secret=await decryptTotp(user.totp_secret,env);ok=await verifyTotp(secret,code)}catch{}
    if(!ok){let codes=[];try{codes=JSON.parse(user.totp_recovery_hashes||"[]")}catch{}const normalized=code.toUpperCase().replace(/[^A-Z2-7]/g,""),candidate=normalized?await hash(normalized):"",i=codes.indexOf(candidate);if(i>=0){codes.splice(i,1);await env.DB.prepare("UPDATE users SET totp_recovery_hashes=? WHERE id=?").bind(JSON.stringify(codes),user.id).run();ok=true}}
