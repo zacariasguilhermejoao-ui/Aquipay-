@@ -257,15 +257,15 @@ async function api(req,env,ctx){const u=new URL(req.url),p=u.pathname,m=req.meth
     if(!env.GOOGLE_CLIENT_ID)return err('O início de sessão com Google não está configurado.',503);
     let c;try{c=await googleClaims(b.credential,env.GOOGLE_CLIENT_ID)}catch{return err('Credencial Google inválida.',401)}
     const email=String(c.email||'').toLowerCase();if(c.email_verified!==true&&c.email_verified!=='true'||!emailOk(email))return err('Email Google não verificado.',403);
-    x=await env.DB.prepare('SELECT id,status,deletion_requested_at,deletion_due_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE google_sub=? OR email=?').bind(c.sub,email).first();
+    x=await env.DB.prepare('SELECT id,name,email,status,deletion_requested_at,deletion_due_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE google_sub=? OR email=?').bind(c.sub,email).first();
     if(x&&x.status==='active')await env.DB.prepare('UPDATE users SET google_sub=COALESCE(google_sub,?) WHERE id=?').bind(c.sub,x.id).run();
   }else{
     const email=clean(b.email,254).toLowerCase(),password=typeof b.password==='string'?b.password:'';
     if(!emailOk(email)||!password)return err('Indica o email e a palavra-passe da conta.');
-    x=await env.DB.prepare('SELECT id,status,password_hash,password_salt,deletion_requested_at,deletion_due_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE email=?').bind(email).first();
+    x=await env.DB.prepare('SELECT id,name,email,status,password_hash,password_salt,deletion_requested_at,deletion_due_at,totp_enabled,totp_secret,totp_recovery_hashes FROM users WHERE email=?').bind(email).first();
     if(!x||x.status!=='active'||await passHash(password,x.password_salt)!==x.password_hash)return err('Email ou palavra-passe incorretos.',401);
   }
-  if(!x||x.status!=='active')return err('Não foi encontrada uma conta ativa para esses dados.',404);if(x.totp_enabled){const checked=await verifyAccountCode(x,b.code,env);if(!checked.ok)return err('Código do autenticador obrigatório ou incorreto.',403)}
+  if(!x||x.status!=='active')return err('Não foi encontrada uma conta ativa para esses dados.',404);if(x.totp_enabled){const checked=await verifyAccountCode(x,b.code,env);if(!checked.ok)return err('Código do autenticador obrigatório ou incorreto.',403)}if(!b.emailCode){try{const result=await createEmailActionCode(env,x.id,x.email,'account_delete');return out({ok:true,requiresEmailCode:true,...result})}catch(e){return err(e.message==='email_code_cooldown'?'Aguarda 60 segundos antes de pedir outro código.':'Não foi possível enviar o código. Tenta novamente mais tarde.',e.message==='email_code_cooldown'?429:503)}}if(!await verifyEmailActionCode(env,x.id,'account_delete',x.email,b.emailCode))return err('Código enviado ao e-mail inválido ou expirado.',403)
   if(x.deletion_requested_at)return out({ok:true,alreadyRequested:true,deletionRequestedAt:x.deletion_requested_at,deletionDueAt:x.deletion_due_at});
   const now=new Date(),due=new Date(now.getTime()+30*86400000).toISOString(),requested=now.toISOString();
   await env.DB.prepare('UPDATE users SET deletion_requested_at=?,deletion_due_at=? WHERE id=? AND status=\'active\'').bind(requested,due,x.id).run();
