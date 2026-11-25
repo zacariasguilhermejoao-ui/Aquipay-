@@ -67,11 +67,29 @@ export async function buyCoins(productId, api) {
   if (!nativeAndroid()) throw new Error('Compras só disponíveis na aplicação Android.');
   const pack = PLAY_PRODUCTS.coins.find(x => x.id === productId);
   if (!pack) throw new Error('Pacote de moedas inválido.');
+  if (!api) throw new Error('Não foi possível validar a tua sessão. Entra novamente e tenta outra vez.');
+  if (!billingReady) {
+    const ready = await initPurchases();
+    if (!ready.ok) throw new Error('A Google Play Billing não está disponível neste dispositivo.');
+  }
+
+  // Consultar o produto imediatamente antes da compra evita usar IDs ou ofertas em cache.
+  const { products = [] } = await NativePurchases.getProducts({
+    productIdentifiers: [productId],
+    productType: PURCHASE_TYPE.INAPP,
+  });
+  const product = products.find(p =>
+    [p.identifier, p.productIdentifier, p.productId].includes(productId)
+  );
+  if (!product) throw new Error('Este pacote não foi encontrado na Google Play. Confirma se está ativo e disponível para a faixa de testes desta aplicação.');
+
   const transaction = await NativePurchases.purchaseProduct({
     productIdentifier: productId,
     productType: PURCHASE_TYPE.INAPP,
     quantity: 1,
-    isConsumable: true,
+    ...(product.offerToken ? { offerToken: product.offerToken } : {}),
+    // O Worker só consome o produto depois de validar e creditar as moedas.
+    isConsumable: false,
     autoAcknowledgePurchases: false,
   });
   const verified = await sendForVerification(api, 'coins', productId, transaction);
@@ -82,9 +100,27 @@ export async function buyPlus(api) {
   if (!nativeAndroid()) throw new Error('O Plus só pode ser comprado na aplicação Android.');
   const { id, basePlanId } = PLAY_PRODUCTS.plus;
   if (!id || !basePlanId) throw new Error('O produto e o plano mensal Plus não estão configurados.');
+  if (!api) throw new Error('Não foi possível validar a tua sessão. Entra novamente e tenta outra vez.');
+  if (!billingReady) {
+    const ready = await initPurchases();
+    if (!ready.ok) throw new Error('A Google Play Billing não está disponível neste dispositivo.');
+  }
+
+  // O token da oferta é obtido e utilizado na mesma consulta, evitando ofertas inválidas.
+  const { products = [] } = await NativePurchases.getProducts({
+    productIdentifiers: [id],
+    productType: PURCHASE_TYPE.SUBS,
+  });
+  const product = products.find(p =>
+    (p.identifier === basePlanId || p.basePlanId === basePlanId) &&
+    (p.planIdentifier === id || p.productIdentifier === id || p.productId === id || !p.planIdentifier)
+  );
+  if (!product) throw new Error('O plano mensal do AquiPay Plus não foi encontrado na Google Play. Confirma se o plano «monthly» está ativo e disponível para a faixa de testes.');
+
   const transaction = await NativePurchases.purchaseProduct({
     productIdentifier: id,
     planIdentifier: basePlanId,
+    ...(product.offerToken ? { offerToken: product.offerToken } : {}),
     productType: PURCHASE_TYPE.SUBS,
     quantity: 1,
     autoAcknowledgePurchases: false,
