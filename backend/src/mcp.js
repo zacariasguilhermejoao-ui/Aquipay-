@@ -7,9 +7,9 @@ const headers = {
 const response = (body, status=200) => new Response(JSON.stringify(body), {status, headers});
 const rpcError = (id, code, message) => response({jsonrpc:"2.0", id:id ?? null, error:{code,message}});
 const b64 = bytes => {
-  let s="";
-  for (const b of new Uint8Array(bytes)) s+=String.fromCharCode(b);
-  return btoa(s).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,"");
+  let value="";
+  for (const byte of new Uint8Array(bytes)) value+=String.fromCharCode(byte);
+  return btoa(value).split("+").join("-").split("/").join("_").replace(/=+$/g,"");
 };
 const sha256 = async value => b64(await crypto.subtle.digest("SHA-256", enc.encode(value)));
 const textResult = value => ({content:[{type:"text",text:JSON.stringify(value)}]});
