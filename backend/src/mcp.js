@@ -495,6 +495,41 @@ async function callTool(name,args,env,user) {
     await env.DB.prepare("DELETE FROM documents WHERE id=? AND user_id=?").bind(id,user.id).run();
     return {ok:true,message:"Documento eliminado."};
   }
+
+  {
+    name:"aquipay_list_my_favorites",
+    description:"Lista anúncios ativos que guardaste nos favoritos.",
+    inputSchema:{type:"object",properties:{limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_add_favorite",
+    description:"Guarda um anúncio nos teus favoritos. Exige confirm=true.",
+    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_remove_favorite",
+    description:"Remove um anúncio dos teus favoritos. Exige confirm=true.",
+    inputSchema:{type:"object",required:["listingId","confirm"],properties:{listingId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+
+  if (name==="aquipay_list_my_favorites") {
+    const limit=Number.isInteger(args.limit)?Math.max(1,Math.min(100,args.limit)):50;
+    const rows=await env.DB.prepare("SELECT l.id,l.kind,l.title,l.description,l.price_minor,l.currency,l.city,l.country,l.created_at,u.id owner_id,u.name owner_name,f.created_at favorited_at FROM listing_favorites f JOIN listings l ON l.id=f.listing_id JOIN users u ON u.id=l.owner_id WHERE f.user_id=? AND l.status='active' AND u.status='active' AND u.deletion_requested_at IS NULL ORDER BY f.created_at DESC LIMIT ?").bind(user.id,limit).all();
+    return {favorites:rows.results||[],count:(rows.results||[]).length};
+  }
+  if (name==="aquipay_add_favorite" || name==="aquipay_remove_favorite") {
+    if(args.confirm!==true)throw new Error("Ação não executada. Define confirm=true.");
+    const listingId=String(args.listingId||"").trim();
+    if(!listingId)throw new Error("Anúncio inválido.");
+    if(name==="aquipay_remove_favorite"){
+      await env.DB.prepare("DELETE FROM listing_favorites WHERE user_id=? AND listing_id=?").bind(user.id,listingId).run();
+      return {ok:true,favorited:false,message:"Anúncio removido dos favoritos."};
+    }
+    const listing=await env.DB.prepare("SELECT id FROM listings WHERE id=? AND status='active'").bind(listingId).first();
+    if(!listing)throw new Error("Anúncio não encontrado ou indisponível.");
+    await env.DB.prepare("INSERT OR IGNORE INTO listing_favorites(user_id,listing_id) VALUES(?,?)").bind(user.id,listingId).run();
+    return {ok:true,favorited:true,message:"Anúncio guardado nos favoritos."};
+  }
   throw new Error("Ferramenta não encontrada.");
 }
 
@@ -561,6 +596,9 @@ export async function handleAquiPayMcp(request,env) {
       aquipay_report_content:"reports:write",
       aquipay_list_my_documents:"documents:read",
       aquipay_delete_my_document:"documents:write",
+      aquipay_list_my_favorites:"favorites:read",
+      aquipay_add_favorite:"favorites:write",
+      aquipay_remove_favorite:"favorites:write",
     }[message.params.name];
     if(!requiredScope)return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Ferramenta não encontrada."}),isError:true}});
     if(!user.scopes?.includes(requiredScope))return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Esta ligação não tem permissão para esta operação. Revê as permissões da ligação no AquiPay."}),isError:true}});
