@@ -147,6 +147,67 @@ const tools = [
     description:"Lista conversas do utilizador autenticado sem expor mensagens de outras contas.",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
   }
+
+  {
+    name:"aquipay_list_my_followers",
+    description:"Lista os utilizadores que seguem o perfil autenticado.",
+    inputSchema:{type:"object",properties:{limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_list_my_following",
+    description:"Lista os perfis que o utilizador autenticado segue.",
+    inputSchema:{type:"object",properties:{limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_follow_user",
+    description:"Começa a seguir um perfil público. Exige confirm=true.",
+    inputSchema:{type:"object",required:["userId","confirm"],properties:{userId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_unfollow_user",
+    description:"Deixa de seguir um perfil. Exige confirm=true.",
+    inputSchema:{type:"object",required:["userId","confirm"],properties:{userId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_list_user_ratings",
+    description:"Consulta avaliações e média de classificação de um perfil.",
+    inputSchema:{type:"object",required:["userId"],properties:{userId:{type:"string"},limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_rate_user",
+    description:"Avalia um utilizador com quem tiveste uma proposta aceite ou concluída. Uma avaliação por perfil. Exige confirm=true.",
+    inputSchema:{type:"object",required:["userId","stars","confirm"],properties:{userId:{type:"string"},stars:{type:"integer",minimum:1,maximum:5},comment:{type:"string",maxLength:800},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_list_my_blocks",
+    description:"Lista os utilizadores que bloqueaste.",
+    inputSchema:{type:"object",properties:{limit:{type:"integer",minimum:1,maximum:100}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_block_user",
+    description:"Bloqueia um utilizador. Exige confirm=true.",
+    inputSchema:{type:"object",required:["userId","confirm"],properties:{userId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_unblock_user",
+    description:"Remove o bloqueio de um utilizador. Exige confirm=true.",
+    inputSchema:{type:"object",required:["userId","confirm"],properties:{userId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_report_content",
+    description:"Denuncia um perfil ou anúncio por spam, fraude, abuso, conteúdo ilegal, falsidade ou outro motivo. Exige confirm=true.",
+    inputSchema:{type:"object",required:["targetType","targetId","reason","confirm"],properties:{targetType:{type:"string",enum:["user","listing"]},targetId:{type:"string"},reason:{type:"string",enum:["spam","fraud","abuse","illegal","fake","other"]},details:{type:"string",maxLength:1000},confirm:{type:"boolean"}},additionalProperties:false}
+  },
+  {
+    name:"aquipay_list_my_documents",
+    description:"Lista os documentos profissionais privados da tua conta sem expor o conteúdo dos ficheiros.",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  {
+    name:"aquipay_delete_my_document",
+    description:"Elimina um documento profissional próprio do armazenamento e da base de dados. Exige confirm=true.",
+    inputSchema:{type:"object",required:["documentId","confirm"],properties:{documentId:{type:"string"},confirm:{type:"boolean"}},additionalProperties:false}
+  },
 ];
 
 async function callTool(name,args,env,user) {
@@ -343,6 +404,98 @@ async function callTool(name,args,env,user) {
     const active=!!row&&row.status==="active"&&row.expires_at>new Date().toISOString();
     return {plan:active?"plus":"free",subscription:row||null,active,description:active?"Plano Plus ativo.":"Plano gratuito ativo."};
   }
+
+  if (name==="aquipay_list_my_followers" || name==="aquipay_list_my_following") {
+    const limit=Number.isInteger(args.limit)?Math.max(1,Math.min(100,args.limit)):50;
+    const followers=name==="aquipay_list_my_followers";
+    const rows=await env.DB.prepare(followers
+      ? "SELECT u.id,u.name,p.city,p.professions_json,f.created_at FROM user_follows f JOIN users u ON u.id=f.follower_id JOIN profiles p ON p.user_id=u.id WHERE f.followed_id=? AND u.status='active' AND u.deletion_requested_at IS NULL ORDER BY f.created_at DESC LIMIT ?"
+      : "SELECT u.id,u.name,p.city,p.professions_json,f.created_at FROM user_follows f JOIN users u ON u.id=f.followed_id JOIN profiles p ON p.user_id=u.id WHERE f.follower_id=? AND u.status='active' AND u.deletion_requested_at IS NULL ORDER BY f.created_at DESC LIMIT ?"
+    ).bind(user.id,limit).all();
+    return {users:rows.results||[],count:(rows.results||[]).length};
+  }
+  if (name==="aquipay_follow_user" || name==="aquipay_unfollow_user") {
+    if(args.confirm!==true)throw new Error("Ação não executada. Define confirm=true.");
+    const target=String(args.userId||"").trim();
+    if(!target||target===user.id)throw new Error("Perfil inválido.");
+    if(name==="aquipay_unfollow_user"){
+      await env.DB.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").bind(user.id,target).run();
+      return {ok:true,following:false,message:"Deixaste de seguir o perfil."};
+    }
+    const person=await env.DB.prepare("SELECT u.id,u.name FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND u.status='active' AND u.deletion_requested_at IS NULL AND p.public_profile=1").bind(target).first();
+    if(!person)throw new Error("Este perfil não está disponível para seguir.");
+    if(await env.DB.prepare("SELECT 1 ok FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)").bind(user.id,target,target,user.id).first())throw new Error("Não é possível criar esta ligação entre perfis.");
+    const result=await env.DB.prepare("INSERT OR IGNORE INTO user_follows(follower_id,followed_id) VALUES(?,?)").bind(user.id,target).run();
+    if(result.meta?.changes)await env.DB.prepare("INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),target,"follow","Novo seguidor",user.name+" começou a seguir o teu perfil.",JSON.stringify({followerId:user.id})).run();
+    const count=await env.DB.prepare("SELECT COUNT(*) total FROM user_follows WHERE followed_id=?").bind(target).first();
+    return {ok:true,following:true,followersCount:Number(count?.total||0)};
+  }
+  if (name==="aquipay_list_user_ratings") {
+    const target=String(args.userId||"").trim(),limit=Number.isInteger(args.limit)?Math.max(1,Math.min(100,args.limit)):50;
+    const exists=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(target).first();
+    if(!exists)throw new Error("Perfil não encontrado.");
+    const [summary,rows]=await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) total,ROUND(AVG(stars),2) average FROM profile_ratings WHERE target_user_id=?").bind(target).first(),
+      env.DB.prepare("SELECT r.stars,r.comment,r.created_at,u.id reviewer_id,u.name reviewer_name FROM profile_ratings r JOIN users u ON u.id=r.reviewer_user_id WHERE r.target_user_id=? AND u.status='active' AND u.deletion_requested_at IS NULL ORDER BY r.created_at DESC LIMIT ?").bind(target,limit).all()
+    ]);
+    return {userId:target,total:Number(summary?.total||0),average:summary?.average??null,ratings:rows.results||[]};
+  }
+  if (name==="aquipay_rate_user") {
+    if(args.confirm!==true)throw new Error("Avaliação não enviada. Define confirm=true.");
+    const target=String(args.userId||"").trim(),stars=args.stars,comment=typeof args.comment==="string"?args.comment.trim().slice(0,800):"";
+    if(!target||target===user.id||!Number.isInteger(stars)||stars<1||stars>5)throw new Error("Classificação inválida.");
+    const person=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(target).first();
+    if(!person)throw new Error("Utilizador não encontrado.");
+    const interaction=await env.DB.prepare("SELECT 1 ok FROM proposals WHERE status IN ('accepted','completed') AND ((sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)) LIMIT 1").bind(user.id,target,target,user.id).first();
+    if(!interaction)throw new Error("Só podes classificar alguém com quem tiveste uma proposta aceite ou concluída.");
+    await env.DB.prepare("INSERT INTO profile_ratings(id,target_user_id,reviewer_user_id,stars,comment) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),target,user.id,stars,comment).run();
+    await env.DB.prepare("INSERT INTO notifications(id,user_id,kind,title,body,data_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),target,"rating","Nova classificação",user.name+" avaliou o teu perfil com "+stars+" estrela(s).",JSON.stringify({reviewerId:user.id})).run();
+    return {ok:true,message:"Avaliação publicada."};
+  }
+  if (name==="aquipay_list_my_blocks") {
+    const limit=Number.isInteger(args.limit)?Math.max(1,Math.min(100,args.limit)):50;
+    const rows=await env.DB.prepare("SELECT u.id,u.name,b.created_at FROM blocks b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=? ORDER BY b.created_at DESC LIMIT ?").bind(user.id,limit).all();
+    return {blocks:rows.results||[]};
+  }
+  if (name==="aquipay_block_user" || name==="aquipay_unblock_user") {
+    if(args.confirm!==true)throw new Error("Ação não executada. Define confirm=true.");
+    const target=String(args.userId||"").trim();
+    if(!target||target===user.id)throw new Error("Utilizador inválido.");
+    if(name==="aquipay_unblock_user"){
+      await env.DB.prepare("DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?").bind(user.id,target).run();
+      return {ok:true,blocked:false};
+    }
+    const person=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(target).first();
+    if(!person)throw new Error("Utilizador não encontrado.");
+    await env.DB.prepare("INSERT OR IGNORE INTO blocks(blocker_id,blocked_id) VALUES(?,?)").bind(user.id,target).run();
+    await env.DB.prepare("DELETE FROM user_follows WHERE (follower_id=? AND followed_id=?) OR (follower_id=? AND followed_id=?)").bind(user.id,target,target,user.id).run();
+    return {ok:true,blocked:true};
+  }
+  if (name==="aquipay_report_content") {
+    if(args.confirm!==true)throw new Error("Denúncia não enviada. Define confirm=true.");
+    const type=args.targetType,target=String(args.targetId||"").trim(),reason=args.reason;
+    const details=typeof args.details==="string"?args.details.trim().slice(0,1000):"";
+    if(!["user","listing"].includes(type)||!target||!["spam","fraud","abuse","illegal","fake","other"].includes(reason)||(type==="user"&&target===user.id))throw new Error("Denúncia inválida.");
+    const exists=type==="user"
+      ? await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND deletion_requested_at IS NULL").bind(target).first()
+      : await env.DB.prepare("SELECT id FROM listings WHERE id=?").bind(target).first();
+    if(!exists)throw new Error("Conteúdo não encontrado.");
+    const result=await env.DB.prepare("INSERT OR IGNORE INTO reports(id,reporter_id,target_type,target_id,reason,details) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),user.id,type,target,reason,details).run();
+    return {ok:true,duplicate:!result.meta?.changes,message:result.meta?.changes?"Denúncia enviada para análise.":"Esta denúncia já tinha sido registada."};
+  }
+  if (name==="aquipay_list_my_documents") {
+    const rows=await env.DB.prepare("SELECT id,category,original_name,content_type,size_bytes,is_public,created_at FROM documents WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id).all();
+    return {documents:rows.results||[]};
+  }
+  if (name==="aquipay_delete_my_document") {
+    if(args.confirm!==true)throw new Error("Eliminação não executada. Define confirm=true.");
+    const id=String(args.documentId||"").trim();
+    const doc=await env.DB.prepare("SELECT id,object_key FROM documents WHERE id=? AND user_id=?").bind(id,user.id).first();
+    if(!doc)throw new Error("Documento não encontrado na tua conta.");
+    if(env.MEDIA)await env.MEDIA.delete(doc.object_key);
+    await env.DB.prepare("DELETE FROM documents WHERE id=? AND user_id=?").bind(id,user.id).run();
+    return {ok:true,message:"Documento eliminado."};
+  }
   throw new Error("Ferramenta não encontrada.");
 }
 
@@ -395,7 +548,20 @@ export async function handleAquiPayMcp(request,env) {
       aquipay_mark_notifications_read:"notifications:write",
       aquipay_get_conversation_messages:"conversations:read",
       aquipay_send_message:"conversations:write",
-      aquipay_get_subscription:"credits:read"
+      aquipay_get_subscription:"credits:read",
+
+      aquipay_list_my_followers:"social:read",
+      aquipay_list_my_following:"social:read",
+      aquipay_follow_user:"social:write",
+      aquipay_unfollow_user:"social:write",
+      aquipay_list_user_ratings:"ratings:read",
+      aquipay_rate_user:"ratings:write",
+      aquipay_list_my_blocks:"safety:read",
+      aquipay_block_user:"safety:write",
+      aquipay_unblock_user:"safety:write",
+      aquipay_report_content:"reports:write",
+      aquipay_list_my_documents:"documents:read",
+      aquipay_delete_my_document:"documents:write",
     }[message.params.name];
     if(!requiredScope)return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Ferramenta não encontrada."}),isError:true}});
     if(!user.scopes?.includes(requiredScope))return response({jsonrpc:"2.0",id:message.id,result:{...textResult({error:"Esta ligação não tem permissão para esta operação. Revê as permissões da ligação no AquiPay."}),isError:true}});
